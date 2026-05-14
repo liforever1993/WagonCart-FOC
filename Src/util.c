@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <stdlib.h> // for abs()
 #include <string.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "stm32f1xx_hal.h"
 #include "defines.h"
 #include "setup.h"
@@ -219,9 +222,44 @@ static uint8_t standstillAcv = 0;
   
   #ifdef __GNUC__
     int _write(int file, char *data, int len) {
+      (void)file;
       int i;
       for (i = 0; i < len; i++) { __io_putchar( *data++ );}
       return len;
+    }
+
+    int _read(int file, char *data, int len) {
+      (void)file;
+      (void)data;
+      (void)len;
+      return 0;
+    }
+
+    int _close(int file) {
+      (void)file;
+      errno = EBADF;
+      return -1;
+    }
+
+    int _fstat(int file, struct stat *st) {
+      (void)file;
+      if (st != NULL) {
+        st->st_mode = S_IFCHR;
+      }
+      return 0;
+    }
+
+    int _isatty(int file) {
+      (void)file;
+      return 1;
+    }
+
+    off_t _lseek(int file, off_t ptr, int dir) {
+      (void)file;
+      (void)ptr;
+      (void)dir;
+      errno = ESPIPE;
+      return (off_t)-1;
     }
   #endif
 #endif
