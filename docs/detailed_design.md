@@ -343,6 +343,207 @@ Validate thermal and undervoltage warning/shutdown paths.
 Validate inactivity shutdown and telemetry integrity.
 验证静置关机与遥测完整性。
 
+## 16. Config Parameter Reference
+## 16. config 参数作用速查
+This section explains the role of configurable macros in Inc/config.h.
+本节按 Inc/config.h 分区解释可配置宏的作用。
+Validation-only checks and error guards are not repeated here.
+仅用于校验的编译检查和 error 宏不在本节逐条展开。
+
+### 16.1 Variant Selection
+### 16.1 变体选择
+- VARIANT_ADC: 双电位器 ADC 控制方案。
+- VARIANT_USART: 串口控制方案。
+- VARIANT_NUNCHUK: Nunchuk 控制方案。
+- VARIANT_PPM: 遥控 PPM 控制方案。
+- VARIANT_PWM: 遥控 PWM 控制方案。
+- VARIANT_IBUS: FlySky iBUS 控制方案。
+- VARIANT_HOVERCAR: Hovercar 专用配置。
+- VARIANT_HOVERBOARD: Hoverboard 原生通信/平衡扩展配置。
+- VARIANT_TRANSPOTTER: TranspOtter 专用配置。
+- VARIANT_SKATEBOARD: Skateboard 专用配置。
+
+### 16.2 Core Timing And Conversion
+### 16.2 基础时序与换算
+- PWM_FREQ: PWM 和蜂鸣器基准频率。
+- DEAD_TIME: 三相桥臂死区时间。
+- DELAY_IN_MAIN_LOOP: 主循环步长，影响低速任务调度节拍。
+- TIMEOUT: 通用输入超时计数阈值。
+- A2BIT_CONV: 电流安培到 ADC bit 的换算系数。
+- PRINTF_FLOAT_SUPPORT: 允许串口 printf 输出浮点，增大代码体积。
+- ADC_CONV_TIME_1C5 到 ADC_CONV_TIME_239C5: ADC 单次转换时钟周期预定义。
+- ADC_CONV_CLOCK_CYCLES: 当前使用的 ADC 采样周期配置。
+- ADC_CLOCK_DIV: ADC 分频设置。
+- ADC_TOTAL_CONV_TIME: 由分频和采样周期得到的总转换时间，用于相位对齐。
+
+### 16.3 Board Variant
+### 16.3 板型差异
+- BOARD_VARIANT: 主板引脚映射选择。0 为默认板，1 为替代引脚板。
+
+### 16.4 Battery Parameters
+### 16.4 电池参数
+- BAT_FILT_COEF: 电池电压低通滤波系数。
+- BAT_CALIB_REAL_VOLTAGE: 外部实测电池电压标定值。
+- BAT_CALIB_ADC: 与上项对应的 ADC 原始值。
+- BAT_CELLS: 电池串联节数。
+- BAT_LVL2_ENABLE: 二级低电压蜂鸣开关。
+- BAT_LVL1_ENABLE: 一级低电压蜂鸣开关。
+- BAT_DEAD_ENABLE: 严重欠压关机开关。
+- BAT_BLINK_INTERVAL: 电池灯闪烁节拍。
+- BAT_LVL5/BAT_LVL4/BAT_LVL3/BAT_LVL2/BAT_LVL1/BAT_DEAD: 各级电压阈值。
+
+### 16.5 Temperature Parameters
+### 16.5 温度参数
+- TEMP_FILT_COEF: 温度低通滤波系数。
+- TEMP_CAL_LOW_ADC/TEMP_CAL_HIGH_ADC: 两点温度 ADC 标定值。
+- TEMP_CAL_LOW_DEG_C/TEMP_CAL_HIGH_DEG_C: 两点温度实测值。
+- TEMP_WARNING_ENABLE: 过温预警蜂鸣开关。
+- TEMP_WARNING: 过温预警阈值。
+- TEMP_POWEROFF_ENABLE: 过温关机开关。
+- TEMP_POWEROFF: 过温关机阈值。
+
+### 16.6 Motor Control Parameters
+### 16.6 电机控制参数
+- COM_CTRL/SIN_CTRL/FOC_CTRL: 控制器类型枚举。
+- OPEN_MODE/VLT_MODE/SPD_MODE/TRQ_MODE: 控制模式枚举。
+- MOTOR_LEFT_ENA/MOTOR_RIGHT_ENA: 左右电机使能。
+- HALL_MAP_60_DEG: 使用 60 度霍尔映射表。
+- CTRL_TYP_SEL: 默认控制类型选择。
+- CTRL_MOD_REQ: 默认控制模式请求。
+- DIAG_ENA: 诊断使能，决定是否上报码并触发保护逻辑。
+- I_MOT_MAX: 单电机相电流上限。
+- I_DC_MAX: 母线电流二级 chopping 阈值。
+- N_MOT_MAX: 电机转速上限。
+- FIELD_WEAK_ENA: 弱磁/相位提前使能。
+- FIELD_WEAK_MAX: FOC 弱磁最大 d 轴电流。
+- PHASE_ADV_MAX: SIN 模式最大相位提前角。
+- FIELD_WEAK_HI/FIELD_WEAK_LO: 弱磁进入与满量程区间阈值。
+- STANDSTILL_HOLD_ENABLE: 驻停保持开关。
+- ELECTRIC_BRAKE_ENABLE: 电刹功能开关。
+- ELECTRIC_BRAKE_MAX: 电刹最大幅值。
+- ELECTRIC_BRAKE_THRES: 电刹生效阈值。
+
+### 16.7 Default And Safety Parameters
+### 16.7 默认与安全参数
+- INACTIVITY_TIMEOUT: 长时间无动作自动关机分钟数。
+- BEEPS_BACKWARD: 倒车蜂鸣开关。
+- ADC_MARGIN: ADC 自动标定后保留边界。
+- ADC_PROTECT_TIMEOUT: ADC 异常持续计数阈值。
+- ADC_PROTECT_THRESH: ADC 输入越界判定阈值。
+- AUTO_CALIBRATION_ENA: 长按按键进入输入自动标定开关。
+- DEFAULT_RATE: 默认加减速限幅速率。
+- DEFAULT_FILTER: 默认输入低通滤波系数。
+- DEFAULT_SPEED_COEFFICIENT: 默认油门比例系数。
+- DEFAULT_STEER_COEFFICIENT: 默认转向比例系数。
+- RATE/FILTER/SPEED_COEFFICIENT/STEER_COEFFICIENT: 若变体未覆盖则使用上述默认值。
+- INPUTS_NR: 单输入或双输入通道数量自动推导值。
+
+### 16.8 Input Format Parameters
+### 16.8 输入格式参数
+- PRI_INPUT1/PRI_INPUT2: 主输入通道 1/2 的类型和量程定义。
+- AUX_INPUT1/AUX_INPUT2: 辅输入通道 1/2 的类型和量程定义。
+- TYPE: 输入类型编码。0 禁用，1 常规电位器，2 回中电位器，3 自动识别。
+- MIN/MID/MAX: 输入最小、中位、最大标定值。
+- DEADBAND: 中位死区范围。
+
+### 16.9 Cruise, Debug, Buzzer, LCD
+### 16.9 巡航、调试、蜂鸣与 LCD
+- CRUISE_CONTROL_SUPPORT: 巡航控制功能总开关。
+- SUPPORT_BUTTONS_LEFT/SUPPORT_BUTTONS_RIGHT/SUPPORT_BUTTONS: 按键来源配置。
+- DEBUG_SERIAL_USART2/DEBUG_SERIAL_USART3: 文本调试串口开关。
+- DEBUG_SERIAL_PROTOCOL: 串口调试命令协议开关。
+- DEBUG_I2C_LCD: I2C 字符 LCD 调试显示开关。
+- BUZZER_ENABLED: 蜂鸣器总开关。
+
+### 16.10 UART Parameters
+### 16.10 串口参数
+- SERIAL_START_FRAME: 二进制串口协议帧头。
+- SERIAL_BUFFER_SIZE: DMA 接收缓冲区大小。
+- SERIAL_TIMEOUT: 串口命令超时阈值。
+- USART2_BAUD/USART3_BAUD: UART2/UART3 波特率。
+- USART2_WORDLENGTH/USART3_WORDLENGTH: UART 字长配置。
+
+### 16.11 Variant ADC Key Parameters
+### 16.11 VARIANT_ADC 关键参数
+- CONTROL_ADC: 启用 ADC 输入并设定主辅优先级。
+- DUAL_INPUTS: 允许主辅双输入切换。
+- CONTROL_SERIAL_USART3/FEEDBACK_SERIAL_USART3: 右口串口控制/反馈。
+- FLASH_WRITE_KEY: EEPROM 配置有效性版本键。
+- TANK_STEERING: 坦克差速模式。
+- ADC_ALTERNATE_CONNECT: 交换 ADC1/ADC2 接线解释。
+
+### 16.12 Variant USART Key Parameters
+### 16.12 VARIANT_USART 关键参数
+- CONTROL_SERIAL_USART2/CONTROL_SERIAL_USART3: 串口控制输入选择。
+- FEEDBACK_SERIAL_USART2/FEEDBACK_SERIAL_USART3: 串口反馈输出选择。
+- SIDEBOARD_SERIAL_USART2/SIDEBOARD_SERIAL_USART3: sideboard 输入启用与优先级。
+- DUAL_INPUTS: 串口与 sideboard 或双串口主辅切换。
+
+### 16.13 Variant Nunchuk Key Parameters
+### 16.13 VARIANT_NUNCHUK 关键参数
+- CONTROL_NUNCHUK: Nunchuk 输入使能。
+- FILTER/SPEED_COEFFICIENT/STEER_COEFFICIENT: Nunchuk 场景下建议滤波与比例。
+- SUPPORT_BUTTONS: Nunchuk 按键支持开关。
+
+### 16.14 Variant PPM And PWM Key Parameters
+### 16.14 VARIANT_PPM 与 VARIANT_PWM 关键参数
+- CONTROL_PPM_LEFT/CONTROL_PPM_RIGHT: PPM 输入口选择与优先级。
+- PPM_NUM_CHANNELS: PPM 总通道数。
+- CONTROL_PWM_LEFT/CONTROL_PWM_RIGHT: PWM 输入口选择与优先级。
+- TANK_STEERING: 双通道分别控制左右轮。
+- INVERT_R_DIRECTION/INVERT_L_DIRECTION: 电机方向反向。
+
+### 16.15 Variant IBUS Key Parameters
+### 16.15 VARIANT_IBUS 关键参数
+- CONTROL_IBUS: iBUS 解码使能。
+- IBUS_NUM_CHANNELS: iBUS 通道数量。
+- IBUS_LENGTH/IBUS_COMMAND: iBUS 帧格式参数。
+- CONTROL_SERIAL_USART3: iBUS 数据入口串口。
+
+### 16.16 Variant HOVERCAR Key Parameters
+### 16.16 VARIANT_HOVERCAR 关键参数
+- CTRL_MOD_REQ: 默认模式改为 VLT_MODE。
+- CONTROL_ADC: 踏板模拟量输入。
+- SIDEBOARD_SERIAL_USART3/FEEDBACK_SERIAL_USART3: sideboard 传感/灯控。
+- MULTI_MODE_DRIVE: 上电三种驾驶模式选择逻辑总开关。
+- MULTI_MODE_DRIVE_M1_MAX/M2_MAX/M3_MAX: 三档最大目标命令。
+- MULTI_MODE_DRIVE_M1_RATE/M2_RATE/M3_RATE: 三档响应速率。
+- MULTI_MODE_M1_I_MOT_MAX/M2_I_MOT_MAX/M3_I_MOT_MAX: 三档电流上限。
+- MULTI_MODE_M1_N_MOT_MAX/M2_N_MOT_MAX/M3_N_MOT_MAX: 三档速度上限。
+- MULTIPLE_TAP_NR/MULTIPLE_TAP_HI/MULTIPLE_TAP_LO/MULTIPLE_TAP_TIMEOUT: 多击检测参数。
+
+### 16.17 Variant HOVERBOARD Key Parameters
+### 16.17 VARIANT_HOVERBOARD 关键参数
+- SIDEBOARD_SERIAL_USART2/SIDEBOARD_SERIAL_USART3: 双 sideboard 通道定义。
+- FEEDBACK_SERIAL_USART2/FEEDBACK_SERIAL_USART3: sideboard 回传配置。
+- PRI_INPUT1/PRI_INPUT2/AUX_INPUT1/AUX_INPUT2: hoverboard 模式输入映射。
+
+### 16.18 Variant TRANSPOTTER Key Parameters
+### 16.18 VARIANT_TRANSPOTTER 关键参数
+- CONTROL_GAMETRAK: Gametrak 输入逻辑使能。
+- SUPPORT_LCD/SUPPORT_NUNCHUK: 外设支持开关。
+- GAMETRAK_CONNECTION_NORMAL/GAMETRAK_CONNECTION_ALTERNATE: Gametrak 接线映射选择。
+- ROT_P: 方向控制 P 系数。
+- INVERT_R_DIRECTION/INVERT_L_DIRECTION: 电机方向反向。
+
+### 16.19 Variant SKATEBOARD Key Parameters
+### 16.19 VARIANT_SKATEBOARD 关键参数
+- CTRL_MOD_REQ: 默认模式改为 TRQ_MODE。
+- CONTROL_PWM_RIGHT 或 CONTROL_PWM_LEFT: 油门输入通道。
+- INPUT_BRK: 松油门回生刹车强度。
+- STEER_COEFFICIENT: 滑板场景常设为 0 关闭转向混控。
+
+### 16.20 Practical Usage Notes
+### 16.20 使用建议
+When changing variant family, first switch VARIANT_xxx, then verify cable-conflict checks compile cleanly.
+切换变体时先改 VARIANT_xxx，再确认线缆冲突检查可通过编译。
+When changing FLASH_WRITE_KEY, previously saved EEPROM config will be ignored.
+修改 FLASH_WRITE_KEY 后，旧 EEPROM 配置会被视为无效。
+For current-related tuning, adjust I_MOT_MAX first, then I_DC_MAX with safety margin.
+电流调参建议先调 I_MOT_MAX，再留安全余量配置 I_DC_MAX。
+For responsiveness tuning, jointly adjust RATE, FILTER, SPEED_COEFFICIENT, and STEER_COEFFICIENT.
+响应性调优应联合调整 RATE、FILTER、SPEED_COEFFICIENT、STEER_COEFFICIENT。
+
 ---
 
 End of detailed design.
