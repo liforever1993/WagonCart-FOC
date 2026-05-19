@@ -79,6 +79,10 @@ extern uint8_t timeoutFlgSerial;        // Timeout Flag for Rx Serial command: 0
 
 extern volatile int pwml;               // global variable for pwm left. -1000 to 1000
 extern volatile int pwmr;               // global variable for pwm right. -1000 to 1000
+extern int16_t curL_phaA;               // left motor phase A current in ADC bits
+extern int16_t curL_phaB;               // left motor phase B current in ADC bits
+extern int16_t curR_phaB;               // right motor phase B current in ADC bits
+extern int16_t curR_phaC;               // right motor phase C current in ADC bits
 
 extern uint8_t enable;                  // global variable for motor enable
 
@@ -237,8 +241,23 @@ int main(void) {
     printf("Drive mode %i selected: max_speed:%i acc_rate:%i \r\n", drive_mode, max_speed, rate);
   #endif
 
-  // Loop until button is released
-  while(HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) { HAL_Delay(10); }
+  // Loop until button is released and detect startup long-press
+  uint16_t startupPressCnt = 0;
+  while(HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
+    HAL_Delay(10);
+    startupPressCnt++;
+    #if (CTRL_MOD_REQ == SPD_MODE)
+    if (startupPressCnt == 5 * 100) {
+      beepShort(5);
+    }
+    #endif
+  }
+
+  #if (CTRL_MOD_REQ == SPD_MODE)
+  if (startupPressCnt >= 5 * 100) {
+    hallAutoCalibrateStartup();
+  }
+  #endif
 
   #ifdef MULTI_MODE_DRIVE
     // Wait until triggers are released. Exit if timeout elapses (to unblock if the inputs are not calibrated)
@@ -493,7 +512,13 @@ int main(void) {
         #if defined(DEBUG_SERIAL_PROTOCOL)
           process_debug();
         #else
-          printf("in1:%i in2:%i cmdL:%i cmdR:%i BatADC:%i BatV:%i TempADC:%i Temp:%i \r\n",
+          uint8_t hallL = (uint8_t)((!(LEFT_HALL_U_PORT->IDR & LEFT_HALL_U_PIN) << 2) |
+                                     (!(LEFT_HALL_V_PORT->IDR & LEFT_HALL_V_PIN) << 1) |
+                                     (!(LEFT_HALL_W_PORT->IDR & LEFT_HALL_W_PIN)));
+          uint8_t hallR = (uint8_t)((!(RIGHT_HALL_U_PORT->IDR & RIGHT_HALL_U_PIN) << 2) |
+                                     (!(RIGHT_HALL_V_PORT->IDR & RIGHT_HALL_V_PIN) << 1) |
+                                     (!(RIGHT_HALL_W_PORT->IDR & RIGHT_HALL_W_PIN)));
+          printf("in1:%i in2:%i cmdL:%i cmdR:%i BatADC:%i BatV:%i TempADC:%i Temp:%i hallL:%u hallR:%u iLA:%i iLB:%i iRB:%i iRC:%i \r\n",
             input1[inIdx].raw,        // 1: INPUT1
             input2[inIdx].raw,        // 2: INPUT2
             cmdL,                     // 3: output command: [-1000, 1000]
@@ -501,7 +526,13 @@ int main(void) {
             adc_buffer.batt1,         // 5: for battery voltage calibration
             batVoltageCalib,          // 6: for verifying battery voltage calibration
             board_temp_adcFilt,       // 7: for board temperature calibration
-            board_temp_deg_c);        // 8: for verifying board temperature calibration
+            board_temp_deg_c,         // 8: for verifying board temperature calibration
+            hallL,                    // 9: left hall 3-bit position
+            hallR,                    // 10: right hall 3-bit position
+            curL_phaA,                // 11: left phase A current (ADC bits)
+            curL_phaB,                // 12: left phase B current (ADC bits)
+            curR_phaB,                // 13: right phase B current (ADC bits)
+            curR_phaC);               // 14: right phase C current (ADC bits)
         #endif
       }
     #endif

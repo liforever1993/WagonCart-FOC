@@ -80,12 +80,16 @@ void beepLong(uint8_t freq);
 void beepShort(uint8_t freq);
 void beepShortMany(uint8_t cnt, int8_t dir);
 void calcAvgSpeed(void);
+void hallAutoCalibrateStartup(void);
 void adcCalibLim(void);
 void updateCurSpdLim(void);
 void standstillHold(void);
 void electricBrake(uint16_t speedBlend, uint8_t reverseDir);
 void cruiseControl(uint8_t button);
 int  checkInputType(int16_t min, int16_t mid, int16_t max);
+
+extern uint8_t hallMapLeftABC[3];
+extern uint8_t hallMapRightABC[3];
 
 // Input Functions
 void calcInputCmd(InputStruct *in, int16_t out_min, int16_t out_max);

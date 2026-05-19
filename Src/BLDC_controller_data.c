@@ -18,6 +18,7 @@
  */
 
 #include "BLDC_controller.h"
+#include "config.h"
 
 /* Constant parameters (auto storage) */
 const ConstP rtConstP = {
@@ -147,7 +148,17 @@ const ConstP rtConstP = {
   /* Computed Parameter: vec_hallToPos_Value
    * Referenced by: '<S11>/vec_hallToPos'
    */
+#ifdef HALL_MAP_60_DEG
+  /* 60 deg hall placement mapping.
+   * Index is built as (A<<2) | (B<<1) | C, so entries are for hall codes:
+   * [000, 001, 010, 011, 100, 101, 110, 111].
+   * This map encodes forward sequence: 001 -> 011 -> 010 -> 110 -> 100 -> 101.
+   */
+  { 0, 0, 2, 1, 4, 5, 3, 0 }
+#else
+  /* Default mapping used by existing firmware configuration. */
   { 0, 2, 0, 1, 4, 3, 5, 0 }
+#endif
 };
 
 P rtP_Left = {

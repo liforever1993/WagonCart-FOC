@@ -176,14 +176,15 @@ void DMA1_Channel1_IRQHandler(void) {
     uint8_t hall_ul = !(LEFT_HALL_U_PORT->IDR & LEFT_HALL_U_PIN);
     uint8_t hall_vl = !(LEFT_HALL_V_PORT->IDR & LEFT_HALL_V_PIN);
     uint8_t hall_wl = !(LEFT_HALL_W_PORT->IDR & LEFT_HALL_W_PIN);
+    uint8_t hall_left[3] = {hall_ul, hall_vl, hall_wl};
 
     /* Set motor inputs here */
     rtU_Left.b_motEna     = enableFin;
     rtU_Left.z_ctrlModReq = ctrlModReq;  
     rtU_Left.r_inpTgt     = pwml;
-    rtU_Left.b_hallA      = hall_ul;
-    rtU_Left.b_hallB      = hall_vl;
-    rtU_Left.b_hallC      = hall_wl;
+    rtU_Left.b_hallA      = hall_left[hallMapLeftABC[0]];
+    rtU_Left.b_hallB      = hall_left[hallMapLeftABC[1]];
+    rtU_Left.b_hallC      = hall_left[hallMapLeftABC[2]];
     rtU_Left.i_phaAB      = curL_phaA;
     rtU_Left.i_phaBC      = curL_phaB;
     rtU_Left.i_DCLink     = curL_DC;
@@ -214,14 +215,15 @@ void DMA1_Channel1_IRQHandler(void) {
     uint8_t hall_ur = !(RIGHT_HALL_U_PORT->IDR & RIGHT_HALL_U_PIN);
     uint8_t hall_vr = !(RIGHT_HALL_V_PORT->IDR & RIGHT_HALL_V_PIN);
     uint8_t hall_wr = !(RIGHT_HALL_W_PORT->IDR & RIGHT_HALL_W_PIN);
+    uint8_t hall_right[3] = {hall_ur, hall_vr, hall_wr};
 
     /* Set motor inputs here */
     rtU_Right.b_motEna      = enableFin;
     rtU_Right.z_ctrlModReq  = ctrlModReq;
     rtU_Right.r_inpTgt      = pwmr;
-    rtU_Right.b_hallA       = hall_ur;
-    rtU_Right.b_hallB       = hall_vr;
-    rtU_Right.b_hallC       = hall_wr;
+    rtU_Right.b_hallA       = hall_right[hallMapRightABC[0]];
+    rtU_Right.b_hallB       = hall_right[hallMapRightABC[1]];
+    rtU_Right.b_hallC       = hall_right[hallMapRightABC[2]];
     rtU_Right.i_phaAB       = curR_phaB;
     rtU_Right.i_phaBC       = curR_phaC;
     rtU_Right.i_DCLink      = curR_DC;

@@ -109,6 +109,8 @@ uint8_t  timeoutFlgSerial = 0;          // Timeout Flag for Rx Serial command: 0
 
 uint8_t  ctrlModReqRaw = CTRL_MOD_REQ;
 uint8_t  ctrlModReq    = CTRL_MOD_REQ;  // Final control mode request 
+uint8_t  hallMapLeftABC[3]  = {0, 1, 2};
+uint8_t  hallMapRightABC[3] = {0, 1, 2};
 
 #if defined(DEBUG_I2C_LCD) || defined(SUPPORT_LCD)
 LCD_PCF8574_HandleTypeDef lcd;
@@ -121,7 +123,7 @@ static   uint16_t saveValue       = 0;
 static   uint8_t  saveValue_valid = 0;
 #elif !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
 uint16_t VirtAddVarTab[NB_OF_VAR] = {1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009,
-                                     1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018};
+                                     1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020};
 #else
 uint16_t VirtAddVarTab[NB_OF_VAR] = {1000};       // Dummy virtual address to avoid warnings
 #endif
@@ -137,6 +139,7 @@ static int16_t INPUT_MIN;             // [-] Input target minimum limitation
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
   static uint8_t  cur_spd_valid  = 0;
   static uint8_t  inp_cal_valid  = 0;
+  static uint8_t  hall_cal_valid = 0;
 #endif
 
 #if defined(CONTROL_ADC)
@@ -169,6 +172,121 @@ static uint8_t  timeoutFlgSerial_R = 0;               // Timeout Flag for Rx Ser
 SerialSideboard Sideboard_R;
 SerialSideboard Sideboard_R_raw;
 static uint32_t Sideboard_R_len = sizeof(Sideboard_R);
+#endif
+
+#if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
+static uint8_t isValidHallPerm(const uint8_t map[3]) {
+  return (map[0] < 3 && map[1] < 3 && map[2] < 3 &&
+          map[0] != map[1] && map[0] != map[2] && map[1] != map[2]);
+}
+
+static uint16_t packHallPerm(const uint8_t map[3]) {
+  return (uint16_t)((map[0] & 0x3U) | ((map[1] & 0x3U) << 2) | ((map[2] & 0x3U) << 4));
+}
+
+static void unpackHallPerm(uint16_t packed, uint8_t map[3]) {
+  map[0] = (uint8_t)( packed       & 0x3U);
+  map[1] = (uint8_t)((packed >> 2) & 0x3U);
+  map[2] = (uint8_t)((packed >> 4) & 0x3U);
+  if (!isValidHallPerm(map)) {
+    map[0] = 0; map[1] = 1; map[2] = 2;
+  }
+}
+
+static int8_t hallPosFromCode(uint8_t code) {
+  static const int8_t hallToPosDefault[8] = { 0, 2, 0, 1, 4, 3, 5, 0 };
+#ifdef HALL_MAP_60_DEG
+  static const int8_t hallToPos60Deg[8] = { 0, 0, 2, 1, 4, 5, 3, 0 };
+  return hallToPos60Deg[code & 0x7U];
+#else
+  return hallToPosDefault[code & 0x7U];
+#endif
+}
+
+static uint8_t permuteHallCode(uint8_t code, const uint8_t map[3]) {
+  uint8_t bits[3];
+  bits[0] = (uint8_t)((code >> 2) & 0x1U); // A
+  bits[1] = (uint8_t)((code >> 1) & 0x1U); // B
+  bits[2] = (uint8_t)( code       & 0x1U); // C
+  return (uint8_t)((bits[map[0]] << 2) | (bits[map[1]] << 1) | bits[map[2]]);
+}
+
+static uint8_t readHallCodeLeftRaw(void) {
+  return (uint8_t)(((!(LEFT_HALL_U_PORT->IDR & LEFT_HALL_U_PIN)) << 2) |
+                   ((!(LEFT_HALL_V_PORT->IDR & LEFT_HALL_V_PIN)) << 1) |
+                    (!(LEFT_HALL_W_PORT->IDR & LEFT_HALL_W_PIN)));
+}
+
+static uint8_t readHallCodeRightRaw(void) {
+  return (uint8_t)(((!(RIGHT_HALL_U_PORT->IDR & RIGHT_HALL_U_PIN)) << 2) |
+                   ((!(RIGHT_HALL_V_PORT->IDR & RIGHT_HALL_V_PIN)) << 1) |
+                    (!(RIGHT_HALL_W_PORT->IDR & RIGHT_HALL_W_PIN)));
+}
+
+static uint8_t findBestHallPerm(const uint16_t trans[8][8], const uint8_t current[3], uint8_t out[3]) {
+  static const uint8_t perms[6][3] = {
+    {0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}
+  };
+
+  int32_t bestScore = -2147483647;
+  uint16_t bestDir = 0;
+  uint16_t bestInvalid = 65535;
+  uint8_t bestIdx = 0;
+
+  for (uint8_t p = 0; p < 6; p++) {
+    uint16_t forward = 0;
+    uint16_t reverse = 0;
+    uint16_t invalid = 0;
+
+    for (uint8_t from = 0; from < 8; from++) {
+      for (uint8_t to = 0; to < 8; to++) {
+        uint16_t cnt = trans[from][to];
+        if (cnt == 0) {
+          continue;
+        }
+
+        int8_t posFrom = hallPosFromCode(permuteHallCode(from, perms[p]));
+        int8_t posTo   = hallPosFromCode(permuteHallCode(to, perms[p]));
+
+        if (posFrom < 0 || posFrom > 5 || posTo < 0 || posTo > 5) {
+          invalid = (uint16_t)(invalid + cnt);
+          continue;
+        }
+
+        uint8_t step = (uint8_t)((posTo - posFrom + 6) % 6);
+        if (step == 1) {
+          forward = (uint16_t)(forward + cnt);
+        } else if (step == 5) {
+          reverse = (uint16_t)(reverse + cnt);
+        } else {
+          invalid = (uint16_t)(invalid + cnt);
+        }
+      }
+    }
+
+    uint16_t dir = (forward > reverse) ? forward : reverse;
+    int32_t score = (int32_t)(dir * 4) - (int32_t)(invalid * 5);
+    if (score > bestScore || (score == bestScore && invalid < bestInvalid)) {
+      bestScore = score;
+      bestDir = dir;
+      bestInvalid = invalid;
+      bestIdx = p;
+    }
+  }
+
+  out[0] = perms[bestIdx][0];
+  out[1] = perms[bestIdx][1];
+  out[2] = perms[bestIdx][2];
+
+  if (bestDir < 6 || bestInvalid > (uint16_t)(bestDir / 2U)) {
+    out[0] = current[0];
+    out[1] = current[1];
+    out[2] = current[2];
+    return 0;
+  }
+
+  return 1;
+}
 #endif
 
 #if defined(CONTROL_SERIAL_USART2)
@@ -361,6 +479,15 @@ void Input_Init(void) {
           input1[i].typ, input1[i].min, input1[i].mid, input1[i].max,
           input2[i].typ, input2[i].min, input2[i].mid, input2[i].max);
       }
+
+      EE_ReadVariable(VirtAddVarTab[19], &readVal); unpackHallPerm(readVal, hallMapLeftABC);
+      EE_ReadVariable(VirtAddVarTab[20], &readVal); unpackHallPerm(readVal, hallMapRightABC);
+
+      #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+      printf("Hall map L:[%u %u %u] R:[%u %u %u]\r\n",
+        hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2],
+        hallMapRightABC[0], hallMapRightABC[1], hallMapRightABC[2]);
+      #endif
     } else {
       #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
         printf("Using the configuration from config.h\r\n");
@@ -381,6 +508,9 @@ void Input_Init(void) {
           input1[i].typ, input1[i].min, input1[i].mid, input1[i].max,
           input2[i].typ, input2[i].min, input2[i].mid, input2[i].max);
       }
+
+      hallMapLeftABC[0] = 0; hallMapLeftABC[1] = 1; hallMapLeftABC[2] = 2;
+      hallMapRightABC[0] = 0; hallMapRightABC[1] = 1; hallMapRightABC[2] = 2;
     }
     HAL_FLASH_Lock();
   #endif
@@ -695,6 +825,93 @@ void updateCurSpdLim(void) {
           cur_spd_valid, input1_fixdt, cur_factor, rtP_Left.i_max, input2_fixdt, spd_factor, rtP_Left.n_max);
   #endif
 
+#endif
+}
+
+void hallAutoCalibrateStartup(void) {
+#if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
+  uint16_t transL[8][8] = {{0}};
+  uint16_t transR[8][8] = {{0}};
+  uint8_t prevL = readHallCodeLeftRaw();
+  uint8_t prevR = readHallCodeRightRaw();
+  uint16_t edgesL = 0;
+  uint16_t edgesR = 0;
+  uint8_t newMapL[3] = {hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2]};
+  uint8_t newMapR[3] = {hallMapRightABC[0], hallMapRightABC[1], hallMapRightABC[2]};
+
+  // Force motors to freewheel during calibration.
+  enable = 0;
+  LEFT_TIM->BDTR &= ~TIM_BDTR_MOE;
+  RIGHT_TIM->BDTR &= ~TIM_BDTR_MOE;
+  LEFT_TIM->LEFT_TIM_U   = (uint16_t)(LEFT_TIM->ARR >> 1);
+  LEFT_TIM->LEFT_TIM_V   = (uint16_t)(LEFT_TIM->ARR >> 1);
+  LEFT_TIM->LEFT_TIM_W   = (uint16_t)(LEFT_TIM->ARR >> 1);
+  RIGHT_TIM->RIGHT_TIM_U = (uint16_t)(RIGHT_TIM->ARR >> 1);
+  RIGHT_TIM->RIGHT_TIM_V = (uint16_t)(RIGHT_TIM->ARR >> 1);
+  RIGHT_TIM->RIGHT_TIM_W = (uint16_t)(RIGHT_TIM->ARR >> 1);
+  beepLong(12);
+
+  #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+  printf("Hall auto calibration: rotate wheels by hand for ~8 seconds...\r\n");
+  #endif
+
+  for (uint16_t i = 0; i < 1600; i++) {
+    uint8_t hallL = readHallCodeLeftRaw();
+    uint8_t hallR = readHallCodeRightRaw();
+
+    if (hallL != prevL) {
+      if (prevL != 0 && prevL != 7 && hallL != 0 && hallL != 7) {
+        transL[prevL][hallL]++;
+        edgesL++;
+      }
+      prevL = hallL;
+    }
+
+    if (hallR != prevR) {
+      if (prevR != 0 && prevR != 7 && hallR != 0 && hallR != 7) {
+        transR[prevR][hallR]++;
+        edgesR++;
+      }
+      prevR = hallR;
+    }
+
+    HAL_Delay(5);
+  }
+
+  uint8_t okL = 0;
+  uint8_t okR = 0;
+  if (edgesL >= 8) {
+    okL = findBestHallPerm(transL, hallMapLeftABC, newMapL);
+  }
+  if (edgesR >= 8) {
+    okR = findBestHallPerm(transR, hallMapRightABC, newMapR);
+  }
+
+  if (okL) {
+    hallMapLeftABC[0] = newMapL[0];
+    hallMapLeftABC[1] = newMapL[1];
+    hallMapLeftABC[2] = newMapL[2];
+  }
+  if (okR) {
+    hallMapRightABC[0] = newMapR[0];
+    hallMapRightABC[1] = newMapR[1];
+    hallMapRightABC[2] = newMapR[2];
+  }
+
+  if (okL || okR) {
+    hall_cal_valid = 1;
+    saveConfig();
+    beepShortMany(3, 1);
+  } else {
+    beepShortMany(2, -1);
+  }
+
+  #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+  printf("Hall auto calibration done. edges L:%u R:%u, map L:[%u %u %u] R:[%u %u %u]\r\n",
+    edgesL, edgesR,
+    hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2],
+    hallMapRightABC[0], hallMapRightABC[1], hallMapRightABC[2]);
+  #endif
 #endif
 }
 
@@ -1571,7 +1788,7 @@ void saveConfig() {
     }
   #endif
   #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
-    if (inp_cal_valid || cur_spd_valid) {
+    if (inp_cal_valid || cur_spd_valid || hall_cal_valid) {
       #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
         printf("Saving configuration to EEprom\r\n");
       #endif
@@ -1590,7 +1807,10 @@ void saveConfig() {
         EE_WriteVariable(VirtAddVarTab[ 9+8*i] , (uint16_t)input2[i].mid);
         EE_WriteVariable(VirtAddVarTab[10+8*i] , (uint16_t)input2[i].max);
       }
+      EE_WriteVariable(VirtAddVarTab[19], packHallPerm(hallMapLeftABC));
+      EE_WriteVariable(VirtAddVarTab[20], packHallPerm(hallMapRightABC));
       HAL_FLASH_Lock();
+      hall_cal_valid = 0;
     }
   #endif 
 }
