@@ -114,6 +114,13 @@ uint16_t pwm_CNT_prev_ch1 = 0;
 uint16_t pwm_CNT_prev_ch2 = 0;
 uint32_t pwm_timeout_ch1 = 0;
 uint32_t pwm_timeout_ch2 = 0;
+// Last accepted stable value — used to detect motor back-EMF noise spikes.
+// A new reading is only accepted if it is within PWM_NOISE_FILTER_US of the
+// current stable value, preventing isolated noise pulses from corrupting the
+// captured PWM width.
+#define PWM_NOISE_FILTER_US  200
+static uint16_t pwm_stable_ch1 = 500;
+static uint16_t pwm_stable_ch2 = 500;
 
 void PWM_ISR_CH1_Callback(void) {
   // Dummy loop with 16 bit count wrap around
@@ -127,10 +134,17 @@ void PWM_ISR_CH1_Callback(void) {
   } else {                                    // Falling Edge interrupt -> measure pulse duration
     uint16_t rc_signal = TIM2->CNT - pwm_CNT_prev_ch1;
     if (IN_RANGE(rc_signal, 900, 2100)){
-      timeoutCntGen = 0;
-      timeoutFlgGen = 0;
-      pwm_timeout_ch1 = 0;
-      pwm_captured_ch1_value = CLAMP(rc_signal, 1000, 2000) - 1000;
+      uint16_t new_val = CLAMP(rc_signal, 1000, 2000) - 1000;
+      int16_t  delta   = (int16_t)new_val - (int16_t)pwm_stable_ch1;
+      if (delta < 0) delta = -delta;
+      // Accept only if change is gradual (real RC) or channel has timed out
+      if (delta <= PWM_NOISE_FILTER_US || pwm_timeout_ch1 > 100) {
+        timeoutCntGen = 0;
+        timeoutFlgGen = 0;
+        pwm_timeout_ch1 = 0;
+        pwm_stable_ch1          = new_val;
+        pwm_captured_ch1_value  = new_val;
+      }
     }
   }
 }
@@ -147,10 +161,16 @@ void PWM_ISR_CH2_Callback(void) {
   } else {                                    // Falling Edge interrupt -> measure pulse duration
     uint16_t rc_signal = TIM2->CNT - pwm_CNT_prev_ch2;
     if (IN_RANGE(rc_signal, 900, 2100)){
-      timeoutCntGen = 0;
-      timeoutFlgGen = 0;
-      pwm_timeout_ch2 = 0;
-      pwm_captured_ch2_value = CLAMP(rc_signal, 1000, 2000) - 1000;
+      uint16_t new_val = CLAMP(rc_signal, 1000, 2000) - 1000;
+      int16_t  delta   = (int16_t)new_val - (int16_t)pwm_stable_ch2;
+      if (delta < 0) delta = -delta;
+      if (delta <= PWM_NOISE_FILTER_US || pwm_timeout_ch2 > 100) {
+        timeoutCntGen = 0;
+        timeoutFlgGen = 0;
+        pwm_timeout_ch2 = 0;
+        pwm_stable_ch2          = new_val;
+        pwm_captured_ch2_value  = new_val;
+      }
     }
   }
 }

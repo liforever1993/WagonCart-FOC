@@ -511,7 +511,7 @@ int main(void) {
       if (main_loop_counter % 25 == 0) {    // Send data periodically every 125 ms      
         #if defined(DEBUG_SERIAL_PROTOCOL)
           process_debug();
-        #else
+        #elif defined(MOTOR_LEFT_ENA) && defined(MOTOR_RIGHT_ENA)
           uint8_t hallL = (uint8_t)((!(LEFT_HALL_U_PORT->IDR & LEFT_HALL_U_PIN) << 2) |
                                      (!(LEFT_HALL_V_PORT->IDR & LEFT_HALL_V_PIN) << 1) |
                                      (!(LEFT_HALL_W_PORT->IDR & LEFT_HALL_W_PIN)));
@@ -533,6 +533,36 @@ int main(void) {
             curL_phaB,                // 12: left phase B current (ADC bits)
             curR_phaB,                // 13: right phase B current (ADC bits)
             curR_phaC);               // 14: right phase C current (ADC bits)
+        #elif defined(MOTOR_LEFT_ENA)
+            uint8_T hallL = (uint8_t)((!(LEFT_HALL_U_PORT->IDR & LEFT_HALL_U_PIN) << 2) |
+                                 (!(LEFT_HALL_V_PORT->IDR & LEFT_HALL_V_PIN) << 1) |
+                                 (!(LEFT_HALL_W_PORT->IDR & LEFT_HALL_W_PIN)));
+          printf("in1:%i in2:%i cmdL:%i BatADC:%i BatV:%i TempADC:%i Temp:%i hallL:%u iLA:%i iLB:%i \r\n",
+            input1[inIdx].raw,        // 1: INPUT1
+            input2[inIdx].raw,        // 2: INPUT2
+            cmdL,                     // 3: output command: [-1000, 1000]
+            adc_buffer.batt1,         // 4: for battery voltage calibration
+            batVoltageCalib,          // 5: for verifying battery voltage calibration
+            board_temp_adcFilt,       // 6: for board temperature calibration
+            board_temp_deg_c,         // 7: for verifying board temperature calibration
+            hallL,                    // 8: left hall 3-bit position
+            curL_phaA,                // 9: left phase A current (ADC bits)
+            curL_phaB);               // 10: left phase B current (ADC bits)
+        #elif defined(MOTOR_RIGHT_ENA)
+          uint8_t hallR = (uint8_t)((!(RIGHT_HALL_U_PORT->IDR & RIGHT_HALL_U_PIN) << 2) |
+                                     (!(RIGHT_HALL_V_PORT->IDR & RIGHT_HALL_V_PIN) << 1) |
+                                     (!(RIGHT_HALL_W_PORT->IDR & RIGHT_HALL_W_PIN)));
+          printf("in1:%i in2:%i cmdR:%i BatADC:%i BatV:%i TempADC:%i Temp:%i hallR:%u iRB:%i iRC:%i \r\n",
+            input1[inIdx].raw,        // 1: INPUT1
+            input2[inIdx].raw,        // 2: INPUT2
+            cmdR,                     // 3: output command: [-1000, 1000]
+            adc_buffer.batt1,         // 4: for battery voltage calibration
+            batVoltageCalib,          // 5: for verifying battery voltage calibration
+            board_temp_adcFilt,       // 6: for board temperature calibration
+            board_temp_deg_c,         // 7: for verifying board temperature calibration
+            hallR,                    // 8: right hall 3-bit position
+            curR_phaB,                // 9: right phase B current (ADC bits)
+            curR_phaC);               // 10: right phase C current (ADC bits)
         #endif
       }
     #endif
@@ -598,7 +628,7 @@ int main(void) {
       beepCount(0, 10, 6);
     } else if (BAT_LVL2_ENABLE && batVoltage < BAT_LVL2) {                                            // 1 beep slow (medium pitch): Low bat 2
       beepCount(0, 10, 30);
-    } else if (BEEPS_BACKWARD && (((cmdR < -50 || cmdL < -50) && speedAvg < 0) || MultipleTapBrake.b_multipleTap)) { // 1 beep fast (high pitch): Backward spinning motors
+    } else if (BEEPS_BACKWARD && (((cmdR < -50 && cmdL < -50) && speedAvg < 0) || MultipleTapBrake.b_multipleTap)) { // 1 beep fast (high pitch): Backward spinning motors
       beepCount(0, 5, 1);
       backwardDrive = 1;
     } else {  // do not beep
