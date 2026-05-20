@@ -508,6 +508,7 @@ int main(void) {
 
     // ####### DEBUG SERIAL OUT #######
     #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+    #define OUTPUT_FOR_VOFA 1
       if (main_loop_counter % 25 == 0) {    // Send data periodically every 125 ms      
         #if defined(DEBUG_SERIAL_PROTOCOL)
           process_debug();
@@ -518,51 +519,57 @@ int main(void) {
           uint8_t hallR = (uint8_t)((!(RIGHT_HALL_U_PORT->IDR & RIGHT_HALL_U_PIN) << 2) |
                                      (!(RIGHT_HALL_V_PORT->IDR & RIGHT_HALL_V_PIN) << 1) |
                                      (!(RIGHT_HALL_W_PORT->IDR & RIGHT_HALL_W_PIN)));
-          printf("in1:%i in2:%i cmdL:%i cmdR:%i BatADC:%i BatV:%i TempADC:%i Temp:%i hallL:%u hallR:%u iLA:%i iLB:%i iRB:%i iRC:%i \r\n",
+          #if defined(OUTPUT_FOR_VOFA)
+          printf("motor:%i,%i,%i,%i,%i,%i,%u,%u,%i,%i,%i,%i\r\n",
+          #else
+          printf("in1:%i in2:%i cmdL:%i cmdR:%i BatV:%i Temp:%i hallL:%u hallR:%u iLA:%i iLB:%i iRB:%i iRC:%i \r\n",
+          #endif
             input1[inIdx].raw,        // 1: INPUT1
             input2[inIdx].raw,        // 2: INPUT2
             cmdL,                     // 3: output command: [-1000, 1000]
             cmdR,                     // 4: output command: [-1000, 1000]
-            adc_buffer.batt1,         // 5: for battery voltage calibration
-            batVoltageCalib,          // 6: for verifying battery voltage calibration
-            board_temp_adcFilt,       // 7: for board temperature calibration
-            board_temp_deg_c,         // 8: for verifying board temperature calibration
-            hallL,                    // 9: left hall 3-bit position
-            hallR,                    // 10: right hall 3-bit position
-            curL_phaA,                // 11: left phase A current (ADC bits)
-            curL_phaB,                // 12: left phase B current (ADC bits)
-            curR_phaB,                // 13: right phase B current (ADC bits)
-            curR_phaC);               // 14: right phase C current (ADC bits)
+            batVoltageCalib,          // 5: for verifying battery voltage calibration
+            board_temp_deg_c,         // 6: for verifying board temperature calibration
+            hallL,                    // 7: left hall 3-bit position
+            hallR,                    // 8: right hall 3-bit position
+            curL_phaA,                // 9: left phase A current (ADC bits)
+            curL_phaB,                // 10: left phase B current (ADC bits)
+            curR_phaB,                // 11: right phase B current (ADC bits)
+            curR_phaC);               // 12: right phase C current (ADC bits)
         #elif defined(MOTOR_LEFT_ENA)
             uint8_T hallL = (uint8_t)((!(LEFT_HALL_U_PORT->IDR & LEFT_HALL_U_PIN) << 2) |
                                  (!(LEFT_HALL_V_PORT->IDR & LEFT_HALL_V_PIN) << 1) |
                                  (!(LEFT_HALL_W_PORT->IDR & LEFT_HALL_W_PIN)));
-          printf("in1:%i in2:%i cmdL:%i BatADC:%i BatV:%i TempADC:%i Temp:%i hallL:%u iLA:%i iLB:%i \r\n",
+          #if defined(OUTPUT_FOR_VOFA)
+          printf("motor:%i,%i,%i,%i,%i,%u,%i,%i\r\n",
+          #else
+          printf("in1:%i in2:%i cmdL:%i BatV:%i Temp:%i hallL:%u iLA:%i iLB:%i \r\n",
+          #endif
             input1[inIdx].raw,        // 1: INPUT1
             input2[inIdx].raw,        // 2: INPUT2
             cmdL,                     // 3: output command: [-1000, 1000]
-            adc_buffer.batt1,         // 4: for battery voltage calibration
-            batVoltageCalib,          // 5: for verifying battery voltage calibration
-            board_temp_adcFilt,       // 6: for board temperature calibration
-            board_temp_deg_c,         // 7: for verifying board temperature calibration
-            hallL,                    // 8: left hall 3-bit position
-            curL_phaA,                // 9: left phase A current (ADC bits)
-            curL_phaB);               // 10: left phase B current (ADC bits)
+            batVoltageCalib,          // 4: for verifying battery voltage calibration
+            board_temp_deg_c,         // 5: for verifying board temperature calibration
+            hallL,                    // 6: left hall 3-bit position
+            curL_phaA,                // 7: left phase A current (ADC bits)
+            curL_phaB);               // 8: left phase B current (ADC bits)
         #elif defined(MOTOR_RIGHT_ENA)
           uint8_t hallR = (uint8_t)((!(RIGHT_HALL_U_PORT->IDR & RIGHT_HALL_U_PIN) << 2) |
                                      (!(RIGHT_HALL_V_PORT->IDR & RIGHT_HALL_V_PIN) << 1) |
                                      (!(RIGHT_HALL_W_PORT->IDR & RIGHT_HALL_W_PIN)));
-          printf("in1:%i in2:%i cmdR:%i BatADC:%i BatV:%i TempADC:%i Temp:%i hallR:%u iRB:%i iRC:%i \r\n",
+          #if defined(OUTPUT_FOR_VOFA)
+          printf("motor:%i,%i,%i,%i,%i,%u,%i,%i\r\n",
+          #else
+          printf("in1:%i in2:%i cmdR:%i BatV:%i Temp:%i hallR:%u iRB:%i iRC:%i \r\n",
+          #endif
             input1[inIdx].raw,        // 1: INPUT1
             input2[inIdx].raw,        // 2: INPUT2
             cmdR,                     // 3: output command: [-1000, 1000]
-            adc_buffer.batt1,         // 4: for battery voltage calibration
-            batVoltageCalib,          // 5: for verifying battery voltage calibration
-            board_temp_adcFilt,       // 6: for board temperature calibration
-            board_temp_deg_c,         // 7: for verifying board temperature calibration
-            hallR,                    // 8: right hall 3-bit position
-            curR_phaB,                // 9: right phase B current (ADC bits)
-            curR_phaC);               // 10: right phase C current (ADC bits)
+            batVoltageCalib,          // 4: for verifying battery voltage calibration
+            board_temp_deg_c,         // 5: for verifying board temperature calibration
+            hallR,                    // 6: right hall 3-bit position
+            curR_phaB,                // 7: right phase B current (ADC bits)
+            curR_phaC);               // 8: right phase C current (ADC bits)
         #endif
       }
     #endif
