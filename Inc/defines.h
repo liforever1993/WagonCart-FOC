@@ -129,12 +129,13 @@
 //#define SWITCH_PIN GPIO_PIN_1
 //#define SWITCH_PORT GPIOA
 
+// lock power output after ON SWITCH is released.
 #if BOARD_VARIANT == 0
-#define OFF_PIN GPIO_PIN_5
-#define OFF_PORT GPIOA
+#define POWER_EN_PIN GPIO_PIN_5
+#define POWER_EN_PORT GPIOA
 #elif BOARD_VARIANT == 1
-#define OFF_PIN GPIO_PIN_15
-#define OFF_PORT GPIOC
+#define POWER_EN_PIN GPIO_PIN_15
+#define POWER_EN_PORT GPIOC
 #endif
 
 #if BOARD_VARIANT == 0

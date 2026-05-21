@@ -412,8 +412,8 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pin = BUZZER_PIN;
   HAL_GPIO_Init(BUZZER_PORT, &GPIO_InitStruct);
 
-  GPIO_InitStruct.Pin = OFF_PIN;
-  HAL_GPIO_Init(OFF_PORT, &GPIO_InitStruct);
+  GPIO_InitStruct.Pin = POWER_EN_PIN;
+  HAL_GPIO_Init(POWER_EN_PORT, &GPIO_InitStruct);
 
 
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;

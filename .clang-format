@@ -1,0 +1,28 @@
+---
+# 基础风格基于强大的 LLVM 引擎
+BasedOnStyle: LLVM
+Language: Cpp
+
+# 1. 缩进与空格
+IndentWidth: 4                    # 嵌入式标准：4 空格缩进
+UseTab: Never                     # 严格禁用 Tab，全部转换为空格（防止换个软件看代码对齐跑偏）
+ColumnLimit: 120                  # 单行代码长度限制 120 字符，超过自动换行
+
+# 2. 大括号换行（符合嵌入式传统习惯）
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: false    # if, else, for, while 之后的大括号强制换行
+  AfterFunction: true             # 函数体的大括号强制换行
+  AfterStruct: true               # struct 结构体大括号强制换行
+  AfterEnum: true                 # enum 枚举大括号强制换行
+  BeforeElse: true                # else 另起一行（不和 if 的结束括号挤在一起）
+
+# 3. 指针与对齐
+PointerAlignment: Right           # 指针的 * 号靠右对齐，例如：uint8_t *pBuffer;
+AlignConsecutiveMacros: true      # 连续多行的 #define 宏定义自动推齐，极其美观
+AlignConsecutiveAssignments: true # 连续多行的赋值语句（=号）自动对齐
+
+# 4. 其他安全策略
+SortIncludes: false               # 禁用头文件自动排序（防止破坏 stm32 固件库的头文件包含依赖）
+AllowShortIfStatementsOnASingleLine: false # 不允许把 if(a) return; 写在同一行，必须换行
+...
