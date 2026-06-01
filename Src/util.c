@@ -34,9 +34,7 @@
 #include "rtwtypes.h"
 #include "comms.h"
 
-#if defined(DEBUG_I2C_LCD) || defined(SUPPORT_LCD)
-#include "hd44780.h"
-#endif
+#include "log_output.h"
 
 /* =========================== Variable Definitions =========================== */
 
@@ -54,7 +52,7 @@ extern uint8_t buzzerCount;   // global variable for the buzzer counts. can be 1
 extern uint8_t buzzerFreq;    // global variable for the buzzer pitch. can be 1, 2, 3, 4, 5, 6, 7...
 extern uint8_t buzzerPattern; // global variable for the buzzer pattern. can be 1, 2, 3, 4, 5, 6, 7...
 
-extern uint8_t enable; // global variable for motor enable
+extern uint8_t motorEnable; // global variable for motor enable
 
 extern uint8_t nunchuk_data[6];
 extern volatile uint32_t timeoutCntGen; // global counter for general timeout counter
@@ -112,10 +110,6 @@ uint8_t ctrlModReqRaw      = CTRL_MOD_REQ;
 uint8_t ctrlModReq         = CTRL_MOD_REQ; // Final control mode request
 uint8_t hallMapLeftABC[3]  = {0, 1, 2};
 uint8_t hallMapRightABC[3] = {0, 1, 2};
-
-#if defined(DEBUG_I2C_LCD) || defined(SUPPORT_LCD)
-LCD_PCF8574_HandleTypeDef lcd;
-#endif
 
 #ifdef VARIANT_TRANSPOTTER
 float setDistance;
@@ -329,7 +323,7 @@ static uint8_t brakePressed;
 #endif
 
 #if defined(CRUISE_CONTROL_SUPPORT) ||                                                                                 \
-    (defined(STANDSTILL_HOLD_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL) && (CTRL_MOD_REQ != SPD_MODE))
+    (defined(STANDSTILL_HOLD_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL))
 static uint8_t cruiseCtrlAcv = 0;
 static uint8_t standstillAcv = 0;
 #endif
@@ -487,9 +481,7 @@ void Input_Init(void)
     EE_Init(); /* EEPROM Init */
     EE_ReadVariable(VirtAddVarTab[0], &writeCheck);
     if (writeCheck == FLASH_WRITE_KEY) {
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("Using the configuration from EEprom\r\n");
-#endif
+        printf_log("Using the configuration from EEprom\r\n");
 
         EE_ReadVariable(VirtAddVarTab[1], &readVal);
         rtP_Left.i_max = rtP_Right.i_max = (int16_t)readVal;
@@ -513,7 +505,7 @@ void Input_Init(void)
             EE_ReadVariable(VirtAddVarTab[10 + 8 * i], &readVal);
             input2[i].max = (int16_t)readVal;
 
-            printf("Limits Input1: TYP:%i MIN:%i MID:%i MAX:%i\r\nLimits Input2: TYP:%i MIN:%i MID:%i MAX:%i\r\n",
+            printf_log("Limits Input1: TYP:%i MIN:%i MID:%i MAX:%i\r\nLimits Input2: TYP:%i MIN:%i MID:%i MAX:%i\r\n",
                    input1[i].typ, input1[i].min, input1[i].mid, input1[i].max, input2[i].typ, input2[i].min,
                    input2[i].mid, input2[i].max);
         }
@@ -524,9 +516,7 @@ void Input_Init(void)
         unpackHallPerm(readVal, hallMapRightABC);
     }
     else {
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("Using the configuration from config.h\r\n");
-#endif
+        printf_log("Using the configuration from config.h\r\n");
 
         for (uint8_t i = 0; i < INPUTS_NR; i++) {
             if (input1[i].typDef ==
@@ -542,7 +532,7 @@ void Input_Init(void)
             else {
                 input2[i].typ = input2[i].typDef;
             }
-            printf("Limits Input1: TYP:%i MIN:%i MID:%i MAX:%i\r\nLimits Input2: TYP:%i MIN:%i MID:%i MAX:%i\r\n",
+            printf_log("Limits Input1: TYP:%i MIN:%i MID:%i MAX:%i\r\nLimits Input2: TYP:%i MIN:%i MID:%i MAX:%i\r\n",
                    input1[i].typ, input1[i].min, input1[i].mid, input1[i].max, input2[i].typ, input2[i].min,
                    input2[i].mid, input2[i].max);
         }
@@ -555,14 +545,12 @@ void Input_Init(void)
         hallMapRightABC[2] = 2;
     }
     HAL_FLASH_Lock();
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Hall map L:[%u %u %u] R:[%u %u %u]\r\n", hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2],
+    printf_log("Hall map L:[%u %u %u] R:[%u %u %u]\r\n", hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2],
            hallMapRightABC[0], hallMapRightABC[1], hallMapRightABC[2]);
-#endif
 #endif
 
 #ifdef VARIANT_TRANSPOTTER
-    enable = 1;
+    motorEnable = 1;
 
     HAL_FLASH_Unlock();
     EE_Init(); /* EEPROM Init */
@@ -573,49 +561,6 @@ void Input_Init(void)
     if (setDistance < 0.2) {
         setDistance = 1.0;
     }
-#endif
-
-#if defined(DEBUG_I2C_LCD) || defined(SUPPORT_LCD)
-    I2C_Init();
-    HAL_Delay(50);
-    lcd.pcf8574.PCF_I2C_ADDRESS = 0x27;
-    lcd.pcf8574.PCF_I2C_TIMEOUT = 5;
-    lcd.pcf8574.i2c             = hi2c2;
-    lcd.NUMBER_OF_LINES         = NUMBER_OF_LINES_2;
-    lcd.type                    = TYPE0;
-
-    if (LCD_Init(&lcd) != LCD_OK) {
-        // error occured
-        // TODO while(1);
-    }
-
-    LCD_ClearDisplay(&lcd);
-    HAL_Delay(5);
-    LCD_SetLocation(&lcd, 0, 0);
-#ifdef VARIANT_TRANSPOTTER
-    LCD_WriteString(&lcd, "TranspOtter V2.1");
-#else
-    LCD_WriteString(&lcd, "Hover V2.0");
-#endif
-    LCD_SetLocation(&lcd, 0, 1);
-    LCD_WriteString(&lcd, "Initializing...");
-#endif
-
-#if defined(VARIANT_TRANSPOTTER) && defined(SUPPORT_LCD)
-    LCD_ClearDisplay(&lcd);
-    HAL_Delay(5);
-    LCD_SetLocation(&lcd, 0, 1);
-    LCD_WriteString(&lcd, "Bat:");
-    LCD_SetLocation(&lcd, 8, 1);
-    LCD_WriteString(&lcd, "V");
-    LCD_SetLocation(&lcd, 15, 1);
-    LCD_WriteString(&lcd, "A");
-    LCD_SetLocation(&lcd, 0, 0);
-    LCD_WriteString(&lcd, "Len:");
-    LCD_SetLocation(&lcd, 8, 0);
-    LCD_WriteString(&lcd, "m(");
-    LCD_SetLocation(&lcd, 14, 0);
-    LCD_WriteString(&lcd, "m)");
 #endif
 }
 
@@ -735,11 +680,7 @@ void adcCalibLim(void)
     }
 
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
-
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Input calibration started...\r\n");
-#endif
-
+    printf_log("Input calibration started...\r\n");
     readInputRaw();
     // Inititalization: MIN = a high value, MAX = a low value
     int32_t input1_fixdt       = input1[inIdx].raw << 16;
@@ -776,38 +717,26 @@ void adcCalibLim(void)
         HAL_Delay(5);
     }
 
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Input1 is ");
-#endif
+    printf_log("Input1 is ");
     uint8_t input1TypTemp = checkInputType(INPUT1_MIN_temp, INPUT1_MID_temp, INPUT1_MAX_temp);
     if (input1TypTemp == input1[inIdx].typDef ||
         input1[inIdx].typDef == 3) { // Accept calibration only if the type is correct OR type was set to 3 (auto)
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("..OK\r\n");
-#endif
+        printf_log("..OK\r\n");
     }
     else {
         input1TypTemp = 0; // Disable input
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("..NOK\r\n");
-#endif
+        printf_log("..NOK\r\n");
     }
 
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Input2 is ");
-#endif
+    printf_log("Input2 is ");
     uint8_t input2TypTemp = checkInputType(INPUT2_MIN_temp, INPUT2_MID_temp, INPUT2_MAX_temp);
     if (input2TypTemp == input2[inIdx].typDef ||
         input2[inIdx].typDef == 3) { // Accept calibration only if the type is correct OR type was set to 3 (auto)
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("..OK\r\n");
-#endif
+        printf_log("..OK\r\n");
     }
     else {
         input2TypTemp = 0; // Disable input
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("..NOK\r\n");
-#endif
+        printf_log("..NOK\r\n");
     }
 
     // At least one of the inputs is not ignored
@@ -823,16 +752,12 @@ void adcCalibLim(void)
         input2[inIdx].max = INPUT2_MAX_temp - input_margin;
 
         inp_cal_valid = 1; // Mark calibration to be saved in Flash at shutdown
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("Limits Input1: TYP:%i MIN:%i MID:%i MAX:%i\r\nLimits Input2: TYP:%i MIN:%i MID:%i MAX:%i\r\n",
+        printf_log("Limits Input1: TYP:%i MIN:%i MID:%i MAX:%i\r\nLimits Input2: TYP:%i MIN:%i MID:%i MAX:%i\r\n",
                input1[inIdx].typ, input1[inIdx].min, input1[inIdx].mid, input1[inIdx].max, input2[inIdx].typ,
                input2[inIdx].min, input2[inIdx].mid, input2[inIdx].max);
-#endif
     }
     else {
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("Both inputs cannot be ignored, calibration rejected.\r\n");
-#endif
+        printf_log("Both inputs cannot be ignored, calibration rejected.\r\n");
     }
 
 #endif
@@ -854,9 +779,7 @@ void updateCurSpdLim(void)
 
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
 
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Torque and Speed limits update started...\r\n");
-#endif
+    printf_log("Torque and Speed limits update started...\r\n");
 
     int32_t input1_fixdt = input1[inIdx].raw << 16;
     int32_t input2_fixdt = input2[inIdx].raw << 16;
@@ -891,100 +814,10 @@ void updateCurSpdLim(void)
         cur_spd_valid += 2; // Mark update to be saved in Flash at shutdown
     }
 
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
     // cur_spd_valid: 0 = No limit changed, 1 = Current limit changed, 2 = Speed limit changed, 3 = Both limits changed
-    printf("Limits (%i)\r\nCurrent: fixdt:%li factor%i i_max:%i \r\nSpeed: fixdt:%li factor:%i n_max:%i\r\n",
+    printf_log("Limits (%i)\r\nCurrent: fixdt:%li factor%i i_max:%i \r\nSpeed: fixdt:%li factor:%i n_max:%i\r\n",
            cur_spd_valid, input1_fixdt, cur_factor, rtP_Left.i_max, input2_fixdt, spd_factor, rtP_Left.n_max);
-#endif
 
-#endif
-}
-
-void hallAutoCalibrateStartup(void)
-{
-#if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
-    uint16_t transL[8][8] = {{0}};
-    uint16_t transR[8][8] = {{0}};
-    uint8_t prevL         = readHallCodeLeftRaw();
-    uint8_t prevR         = readHallCodeRightRaw();
-    uint16_t edgesL       = 0;
-    uint16_t edgesR       = 0;
-    uint8_t newMapL[3]    = {hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2]};
-    uint8_t newMapR[3]    = {hallMapRightABC[0], hallMapRightABC[1], hallMapRightABC[2]};
-
-    // Force motors to freewheel during calibration.
-    enable = 0;
-    LEFT_TIM->BDTR &= ~TIM_BDTR_MOE;
-    RIGHT_TIM->BDTR &= ~TIM_BDTR_MOE;
-    LEFT_TIM->LEFT_TIM_U   = (uint16_t)(LEFT_TIM->ARR >> 1);
-    LEFT_TIM->LEFT_TIM_V   = (uint16_t)(LEFT_TIM->ARR >> 1);
-    LEFT_TIM->LEFT_TIM_W   = (uint16_t)(LEFT_TIM->ARR >> 1);
-    RIGHT_TIM->RIGHT_TIM_U = (uint16_t)(RIGHT_TIM->ARR >> 1);
-    RIGHT_TIM->RIGHT_TIM_V = (uint16_t)(RIGHT_TIM->ARR >> 1);
-    RIGHT_TIM->RIGHT_TIM_W = (uint16_t)(RIGHT_TIM->ARR >> 1);
-    beepLong(12);
-
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Hall auto calibration: rotate wheels by hand for ~8 seconds...\r\n");
-#endif
-
-    for (uint16_t i = 0; i < 1600; i++) {
-        uint8_t hallL = readHallCodeLeftRaw();
-        uint8_t hallR = readHallCodeRightRaw();
-
-        if (hallL != prevL) {
-            if (prevL != 0 && prevL != 7 && hallL != 0 && hallL != 7) {
-                transL[prevL][hallL]++;
-                edgesL++;
-            }
-            prevL = hallL;
-        }
-
-        if (hallR != prevR) {
-            if (prevR != 0 && prevR != 7 && hallR != 0 && hallR != 7) {
-                transR[prevR][hallR]++;
-                edgesR++;
-            }
-            prevR = hallR;
-        }
-
-        HAL_Delay(5);
-    }
-
-    uint8_t okL = 0;
-    uint8_t okR = 0;
-    if (edgesL >= 8) {
-        okL = findBestHallPerm(transL, hallMapLeftABC, newMapL);
-    }
-    if (edgesR >= 8) {
-        okR = findBestHallPerm(transR, hallMapRightABC, newMapR);
-    }
-
-    if (okL) {
-        hallMapLeftABC[0] = newMapL[0];
-        hallMapLeftABC[1] = newMapL[1];
-        hallMapLeftABC[2] = newMapL[2];
-    }
-    if (okR) {
-        hallMapRightABC[0] = newMapR[0];
-        hallMapRightABC[1] = newMapR[1];
-        hallMapRightABC[2] = newMapR[2];
-    }
-
-    if (okL || okR) {
-        hall_cal_valid = 1;
-        saveConfig();
-        beepShortMany(3, 1);
-    }
-    else {
-        beepShortMany(2, -1);
-    }
-
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("Hall auto calibration done. edges L:%u R:%u, map L:[%u %u %u] R:[%u %u %u]\r\n", edgesL, edgesR,
-           hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2], hallMapRightABC[0], hallMapRightABC[1],
-           hallMapRightABC[2]);
-#endif
 #endif
 }
 
@@ -998,7 +831,10 @@ void hallAutoCalibrateStartup(void)
  */
 void standstillHold(void)
 {
-#if defined(STANDSTILL_HOLD_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL) && (CTRL_MOD_REQ != SPD_MODE)
+#if defined(STANDSTILL_HOLD_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL)
+    if (ctrlModReq == SPD_MODE) {
+        return;
+    }
 #if !defined(VARIANT_PWM)
     if (!rtP_Left.b_cruiseCtrlEna) { // If Stanstill in NOT Active -> try Activation
         if (((input1[inIdx].cmd > 50 || input2[inIdx].cmd < -50) &&
@@ -1059,8 +895,12 @@ void standstillHold(void)
  */
 void electricBrake(uint16_t speedBlend, uint8_t reverseDir)
 {
-#if defined(ELECTRIC_BRAKE_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL) && (CTRL_MOD_REQ == TRQ_MODE)
+#if defined(ELECTRIC_BRAKE_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL)
     int16_t brakeVal;
+
+    if (ctrlModReq != TORQUE_MODE) {
+        return;
+    }
 
     // Make sure the Brake pedal is opposite to the direction of motion AND it goes to 0 as we reach standstill (to
     // avoid Reverse driving)
@@ -1140,29 +980,21 @@ int checkInputType(int16_t min, int16_t mid, int16_t max)
 
     if ((min / threshold) == (max / threshold) || (mid / threshold) == (max / threshold) || min > max || mid > max) {
         type = 0;
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("ignored"); // (MIN and MAX) OR (MID and MAX) are close, disable input
-#endif
+        printf_log("ignored"); // (MIN and MAX) OR (MID and MAX) are close, disable input
     }
     else {
         if ((min / threshold) == (mid / threshold)) {
             type = 1;
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-            printf("a normal pot"); // MIN and MID are close, it's a normal pot
-#endif
+            printf_log("a normal pot"); // MIN and MID are close, it's a normal pot
         }
         else {
             type = 2;
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-            printf("a mid-resting pot"); // it's a mid resting pot
-#endif
+            printf_log("a mid-resting pot"); // it's a mid resting pot
         }
 
 #ifdef CONTROL_ADC
         if ((min + ADC_MARGIN - ADC_PROTECT_THRESH) > 0 && (max - ADC_MARGIN + ADC_PROTECT_THRESH) < 4095) {
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-            printf(" AND protected");
-#endif
+            printf_log(" AND protected");
             beepLong(2); // Indicate protection by a beep
         }
 #endif
@@ -1776,12 +1608,12 @@ void sideboardLeds(uint8_t *leds)
 {
 #if defined(SIDEBOARD_SERIAL_USART2) || defined(SIDEBOARD_SERIAL_USART3)
     // Enable flag: use LED4 (bottom Blue)
-    // enable == 1, turn on led
-    // enable == 0, blink led
-    if (enable) {
+    // motorEnable == 1, turn on led
+    // motorEnable == 0, blink led
+    if (motorEnable) {
         *leds |= LED4_SET;
     }
-    else if (!enable && (main_loop_counter % 20 == 0)) {
+    else if (!motorEnable && (main_loop_counter % 20 == 0)) {
         *leds ^= LED4_SET;
     }
 
@@ -1978,9 +1810,7 @@ void saveConfig()
 #endif
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
     if (inp_cal_valid || cur_spd_valid || hall_cal_valid) {
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("Saving configuration to EEprom\r\n");
-#endif
+        printf_log("Saving configuration to EEprom\r\n");
 
         HAL_FLASH_Unlock();
         EE_WriteVariable(VirtAddVarTab[0], (uint16_t)FLASH_WRITE_KEY);
@@ -2006,10 +1836,8 @@ void saveConfig()
 
 void poweroff(void)
 {
-    enable = 0;
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-    printf("-- Motors disabled --\r\n");
-#endif
+    motorEnable = 0;
+    printf_log("-- Motors disabled --\r\n");
     buzzerCount   = 0; // prevent interraction with beep counter
     buzzerPattern = 0;
     for (int i = 0; i < 8; i++) {
@@ -2035,7 +1863,7 @@ void poweroffPressCheck(void)
         }
 
         if (cnt_press > 8)
-            enable = 0;
+            motorEnable = 0;
 
         if (cnt_press >= 5 * 100) { // Check if press is more than 5 sec
             HAL_Delay(1000);
@@ -2056,15 +1884,13 @@ void poweroffPressCheck(void)
             }
         }
         else if (cnt_press > 8) { // Short press: power off (80 ms debounce)
-#if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-            printf("Powering off, button has been pressed\r\n");
-#endif
+            printf_log("Powering off, button has been pressed\r\n");
             poweroff();
         }
     }
 #elif defined(VARIANT_TRANSPOTTER)
     if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-        enable = 0;
+        motorEnable = 0;
         while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
             HAL_Delay(10);
         }
@@ -2090,7 +1916,7 @@ void poweroffPressCheck(void)
     }
 #else
     if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-        enable = 0; // disable motors
+        motorEnable = 0; // disable motors
         while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
         } // wait until button is released
         poweroff(); // release power-latch
