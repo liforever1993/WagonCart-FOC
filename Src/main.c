@@ -266,6 +266,8 @@ int main(void)
                     motorEnable             = 1; // enable motors
                     printf_log("-- Motors enabled --\r\n");
                 }
+                // reset this flag to avoid any startup functionality to be applied after the motors are enabled. This is to avoid any sudden unintended behavior when the motors are enabled.
+                startupIsReady = 0;
             }
 
             if (!startupIsReady) {
