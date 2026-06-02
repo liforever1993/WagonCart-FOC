@@ -632,32 +632,45 @@ void beepShortMany(uint8_t cnt, int8_t dir)
 void calcAvgSpeed(void)
 {
     // Calculate measured average speed. The minus sign (-) is because motors spin in opposite directions
-    speedAvg = 0;
+    int16_t speedTmp = 0;
 #if defined(MOTOR_LEFT_ENA)
 #if defined(INVERT_L_DIRECTION)
-    speedAvg -= rtY_Left.n_mot;
+    speedTmp -= rtY_Left.n_mot;
 #else
-    speedAvg += rtY_Left.n_mot;
+    speedTmp += rtY_Left.n_mot;
 #endif
-#endif
-#if defined(MOTOR_RIGHT_ENA)
-#if defined(INVERT_R_DIRECTION)
-    speedAvg += rtY_Right.n_mot;
-#else
-    speedAvg -= rtY_Right.n_mot;
 #endif
 
+#if defined(MOTOR_RIGHT_ENA)
+#if defined(INVERT_R_DIRECTION)
+    speedTmp += rtY_Right.n_mot;
+#else
+    speedTmp -= rtY_Right.n_mot;
+#endif
     // Average only if both motors are enabled
 #if defined(MOTOR_LEFT_ENA)
-    speedAvg /= 2;
+    speedTmp /= 2;
 #endif
 #endif
 
     // Handle the case when SPEED_COEFFICIENT sign is negative (which is when most significant bit is 1)
-    if (SPEED_COEFFICIENT & (1 << 16)) {
-        speedAvg = -speedAvg;
+    if (SPEED_COEFFICIENT & (1 << 15)) {
+        speedTmp = -speedTmp;
     }
-    speedAvgAbs = abs(speedAvg);
+    speedAvg = speedTmp;
+
+    speedTmp = 0;
+#if defined(MOTOR_LEFT_ENA)
+    speedTmp += ABS(rtY_Left.n_mot);
+#endif
+#if defined(MOTOR_RIGHT_ENA)
+    speedTmp += ABS(rtY_Right.n_mot);
+#endif
+
+#if defined(MOTOR_LEFT_ENA) && defined(MOTOR_RIGHT_ENA)
+    speedTmp /= 2;
+#endif
+    speedAvgAbs = speedTmp;
 }
 
 /*
@@ -862,7 +875,7 @@ void standstillHold(void)
         // control the vehicle through the steering input, so we can safely activate cruise control to provide the
         // standstill hold functionality.
         if ((ABS(input2[inIdx].cmd) < 20) && (ABS(input1[inIdx].cmd) < 20) &&
-            (speedAvgAbs < 5)) { // Throttle is small AND measured speed is very small
+            (speedAvgAbs < 10)) { // Throttle is small AND measured speed is very small
             rtP_Left.n_cruiseMotTgt   = 0;
             rtP_Right.n_cruiseMotTgt  = 0;
             rtP_Left.b_cruiseCtrlEna  = 1;
