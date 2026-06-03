@@ -182,9 +182,9 @@ void DMA1_Channel1_IRQHandler(void) {
     rtU_Left.b_motEna     = enableFin;
     rtU_Left.z_ctrlModReq = ctrlModReq;  
     rtU_Left.r_inpTgt     = pwml;
-    rtU_Left.b_hallA      = hall_left[hallMapLeftABC[0]];
-    rtU_Left.b_hallB      = hall_left[hallMapLeftABC[1]];
-    rtU_Left.b_hallC      = hall_left[hallMapLeftABC[2]];
+    rtU_Left.b_hallA      = hall_left[0];
+    rtU_Left.b_hallB      = hall_left[1];
+    rtU_Left.b_hallC      = hall_left[2];
     rtU_Left.i_phaAB      = curL_phaA;
     rtU_Left.i_phaBC      = curL_phaB;
     rtU_Left.i_DCLink     = curL_DC;
@@ -221,9 +221,9 @@ void DMA1_Channel1_IRQHandler(void) {
     rtU_Right.b_motEna      = enableFin;
     rtU_Right.z_ctrlModReq  = ctrlModReq;
     rtU_Right.r_inpTgt      = pwmr;
-    rtU_Right.b_hallA       = hall_right[hallMapRightABC[0]];
-    rtU_Right.b_hallB       = hall_right[hallMapRightABC[1]];
-    rtU_Right.b_hallC       = hall_right[hallMapRightABC[2]];
+    rtU_Right.b_hallA       = hall_right[0];
+    rtU_Right.b_hallB       = hall_right[1];
+    rtU_Right.b_hallC       = hall_right[2];
     rtU_Right.i_phaAB       = curR_phaB;
     rtU_Right.i_phaBC       = curR_phaC;
     rtU_Right.i_DCLink      = curR_DC;

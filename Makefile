@@ -17,45 +17,63 @@ BUILD_DIR = build
 ######################################
 # source
 ######################################
-# C sources
-C_SOURCES =  \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pwr.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc_ex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash_ex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc_ex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_i2c.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_dma.c \
-Src/system_stm32f1xx.c \
-Src/setup.c \
-Src/control.c \
-Src/comms.c \
-Src/util.c \
-Src/main.c \
-Src/bldc.c \
-Src/eeprom.c \
-components/FlashDB/src/fdb.c \
-components/FlashDB/src/fdb_file.c \
-components/FlashDB/src/fdb_kvdb.c \
-components/FlashDB/src/fdb_tsdb.c \
-components/FlashDB/src/fdb_utils.c \
-components/FlashDB/port/fal/src/fal.c \
-components/FlashDB/port/fal/src/fal_flash.c \
-components/FlashDB/port/fal/src/fal_partition.c \
-Src/fal_stm32f1_port.c \
-Src/device_param.c \
-Src/stm32f1xx_it.c \
-Src/BLDC_controller_data.c \
-Src/BLDC_controller.c
+# Module source definitions
+# Application layer
+APP_SOURCES := \
+	app/main.c \
+	app/control.c \
+	app/comms.c
+
+# Module layer
+MODULE_SOURCES := \
+	modules/util.c \
+	modules/bldc.c \
+	modules/eeprom.c
+
+# Board layer
+BOARD_SOURCES := \
+	board/src/system_stm32f1xx.c \
+	board/src/setup.c \
+	board/src/stm32f1xx_it.c
+
+# Storage/Database layer
+STORAGE_SOURCES := \
+	storage/src/fal_stm32f1_port.c \
+	components/FlashDB/src/fdb.c \
+	components/FlashDB/src/fdb_file.c \
+	components/FlashDB/src/fdb_kvdb.c \
+	components/FlashDB/src/fdb_tsdb.c \
+	components/FlashDB/src/fdb_utils.c \
+	components/FlashDB/port/fal/src/fal.c \
+	components/FlashDB/port/fal/src/fal_flash.c \
+	components/FlashDB/port/fal/src/fal_partition.c
+
+# Generated code (Simulink/Codegen)
+GEN_SOURCES := \
+	gen/BLDC_controller.c \
+	gen/BLDC_controller_data.c
+
+# STM32 HAL drivers
+HAL_SOURCES := \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pwr.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc_ex.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash_ex.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc_ex.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_i2c.c \
+	Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_dma.c
+
+# Combine all sources
+C_SOURCES := $(APP_SOURCES) $(MODULE_SOURCES) $(BOARD_SOURCES) $(STORAGE_SOURCES) $(GEN_SOURCES) $(HAL_SOURCES)
 
 # ASM sources
 ASM_SOURCES =  \
@@ -104,7 +122,12 @@ AS_INCLUDES =
 
 # C includes
 C_INCLUDES =  \
--IInc \
+-Iconfig \
+-Iapp \
+-Imodules \
+-Iboard/include \
+-Istorage/inc \
+-Igen \
 -IDrivers/STM32F1xx_HAL_Driver/Inc \
 -IDrivers/STM32F1xx_HAL_Driver/Inc/Legacy \
 -IDrivers/CMSIS/Device/ST/STM32F1xx/Include \
@@ -158,10 +181,10 @@ vpath %.c $(sort $(dir $(C_SOURCES)))
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
-$(BUILD_DIR)/%.o: %.c Inc/config.h Makefile | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: %.c config/config.h Makefile | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
-$(BUILD_DIR)/%.o: %.s Inc/config.h Makefile | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: %.s config/config.h Makefile | $(BUILD_DIR)
 	$(AS) -c $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) Makefile
@@ -178,7 +201,7 @@ $(BUILD_DIR):
 	mkdir -p $@
 
 format:
-	find Src/ Inc/ -iname '*.h' -o -iname '*.c' | xargs clang-format -i
+	find app/ modules/ board/ storage/ config/ gen/ -iname '*.h' -o -iname '*.c' | xargs clang-format -i
 #######################################
 # clean up
 #######################################
