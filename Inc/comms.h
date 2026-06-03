@@ -97,7 +97,6 @@ struct parameter_entry_struct {
   const uint8_t datatype;
   void *valueL;
   void *valueR;
-  const uint16_t addr;
   const int32_t init;
   const uint8_t initFormat;
   const int32_t min;

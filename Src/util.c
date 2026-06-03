@@ -108,8 +108,6 @@ uint8_t timeoutFlgSerial = 0;
 
 uint8_t ctrlModReqRaw      = CTRL_MOD_REQ;
 uint8_t ctrlModReq         = CTRL_MOD_REQ; // Final control mode request
-uint8_t hallMapLeftABC[3]  = {0, 1, 2};
-uint8_t hallMapRightABC[3] = {0, 1, 2};
 
 #ifdef VARIANT_TRANSPOTTER
 float setDistance;
@@ -509,11 +507,6 @@ void Input_Init(void)
                    input1[i].typ, input1[i].min, input1[i].mid, input1[i].max, input2[i].typ, input2[i].min,
                    input2[i].mid, input2[i].max);
         }
-
-        EE_ReadVariable(VirtAddVarTab[19], &readVal);
-        unpackHallPerm(readVal, hallMapLeftABC);
-        EE_ReadVariable(VirtAddVarTab[20], &readVal);
-        unpackHallPerm(readVal, hallMapRightABC);
     }
     else {
         printf_log("Using the configuration from config.h\r\n");
@@ -536,22 +529,12 @@ void Input_Init(void)
                    input1[i].typ, input1[i].min, input1[i].mid, input1[i].max, input2[i].typ, input2[i].min,
                    input2[i].mid, input2[i].max);
         }
-
-        hallMapLeftABC[0]  = 0;
-        hallMapLeftABC[1]  = 1;
-        hallMapLeftABC[2]  = 2;
-        hallMapRightABC[0] = 0;
-        hallMapRightABC[1] = 1;
-        hallMapRightABC[2] = 2;
     }
     HAL_FLASH_Lock();
-    printf_log("Hall map L:[%u %u %u] R:[%u %u %u]\r\n", hallMapLeftABC[0], hallMapLeftABC[1], hallMapLeftABC[2],
-           hallMapRightABC[0], hallMapRightABC[1], hallMapRightABC[2]);
 #endif
 
 #ifdef VARIANT_TRANSPOTTER
     motorEnable = 1;
-
     HAL_FLASH_Unlock();
     EE_Init(); /* EEPROM Init */
     EE_ReadVariable(VirtAddVarTab[0], &saveValue);
@@ -911,7 +894,7 @@ void electricBrake(uint16_t speedBlend, uint8_t reverseDir)
 #if defined(ELECTRIC_BRAKE_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL)
     int16_t brakeVal;
 
-    if (ctrlModReq != TORQUE_MODE) {
+    if (ctrlModReq != TRQ_MODE) {
         return;
     }
 
@@ -1839,8 +1822,6 @@ void saveConfig()
             EE_WriteVariable(VirtAddVarTab[9 + 8 * i], (uint16_t)input2[i].mid);
             EE_WriteVariable(VirtAddVarTab[10 + 8 * i], (uint16_t)input2[i].max);
         }
-        EE_WriteVariable(VirtAddVarTab[19], packHallPerm(hallMapLeftABC));
-        EE_WriteVariable(VirtAddVarTab[20], packHallPerm(hallMapRightABC));
         HAL_FLASH_Lock();
         hall_cal_valid = 0;
     }

@@ -43,8 +43,16 @@ Src/util.c \
 Src/main.c \
 Src/bldc.c \
 Src/eeprom.c \
-Src/hd44780.c \
-Src/pcf8574.c \
+components/FlashDB/src/fdb.c \
+components/FlashDB/src/fdb_file.c \
+components/FlashDB/src/fdb_kvdb.c \
+components/FlashDB/src/fdb_tsdb.c \
+components/FlashDB/src/fdb_utils.c \
+components/FlashDB/port/fal/src/fal.c \
+components/FlashDB/port/fal/src/fal_flash.c \
+components/FlashDB/port/fal/src/fal_partition.c \
+Src/fal_stm32f1_port.c \
+Src/device_param.c \
 Src/stm32f1xx_it.c \
 Src/BLDC_controller_data.c \
 Src/BLDC_controller.c
@@ -100,7 +108,9 @@ C_INCLUDES =  \
 -IDrivers/STM32F1xx_HAL_Driver/Inc \
 -IDrivers/STM32F1xx_HAL_Driver/Inc/Legacy \
 -IDrivers/CMSIS/Device/ST/STM32F1xx/Include \
--IDrivers/CMSIS/Include
+-IDrivers/CMSIS/Include \
+-Icomponents/FlashDB/inc \
+-Icomponents/FlashDB/port/fal/inc
 
 
 # compile gcc flags
