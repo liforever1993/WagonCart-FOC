@@ -22,6 +22,7 @@
 #define UTIL_H
 
 #include <stdint.h>
+#include "hal_port.h"          /* ← 唯一允许 include HAL 相关内容的 driver 层 */
 
 
 // Rx Structures USART
@@ -29,7 +30,7 @@
   #ifdef CONTROL_IBUS
     typedef struct{
       uint8_t  start;
-      uint8_t  type; 
+      uint8_t  type;
       uint8_t  channels[IBUS_NUM_CHANNELS*2];
       uint8_t  checksuml;
       uint8_t  checksumh;
@@ -71,7 +72,6 @@ typedef struct {
 void BLDC_Init(void);
 void Input_Lim_Init(void);
 void Input_Init(void);
-void UART_DisableRxErrors(UART_HandleTypeDef *huart);
 
 // General Functions
 void poweronMelody(void);
@@ -129,4 +129,3 @@ typedef struct {
 void multipleTapDet(int16_t u, uint32_t timeNow, MultipleTap *x);
 
 #endif
-

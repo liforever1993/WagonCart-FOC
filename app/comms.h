@@ -21,7 +21,7 @@
 #ifndef COMMS_H
 #define COMMS_H
 
-#include "stm32f1xx_hal.h"
+#include <stdint.h>
 
 #if defined(DEBUG_SERIAL_PROTOCOL)
 

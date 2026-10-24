@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stm32f1xx_hal.h"
+#include "hal_port.h"
 #include "config.h"
 #include "defines.h"
 #include "eeprom.h"
@@ -373,7 +373,7 @@ int8_t incrParamVal(uint8_t index) {
 
 // Get internal Parameter value and save it to EEprom for all paraemeter with an address assigned 
 int8_t saveAllParamVal() {
-  HAL_FLASH_Unlock();
+  hal_flash_unlock();
   EE_WriteVariable(VirtAddVarTab[0] , (uint16_t)FLASH_WRITE_KEY);
   for(int i=0;i<PARAM_SIZE(params);i++){ 
     // Only Parameters with eeprom address can be saved
@@ -381,7 +381,7 @@ int8_t saveAllParamVal() {
       EE_WriteVariable(VirtAddVarTab[params[i].addr] , (uint16_t)getParamValInt(i));    
     }
   }
-  HAL_FLASH_Lock();
+  hal_flash_lock();
   return 1;
 }
 
@@ -418,10 +418,10 @@ int16_t getParamInitInt(uint8_t index){
     // if EEPROM address is specified, init from EEPROM address
     uint16_t writeCheck, readVal;
     
-    HAL_FLASH_Unlock();
+    hal_flash_unlock();
     EE_ReadVariable(VirtAddVarTab[0], &writeCheck);
     EE_ReadVariable(VirtAddVarTab[params[index].addr] , &readVal);
-    HAL_FLASH_Lock();
+    hal_flash_lock();
     
     // EEPROM was written, use stored value
     if (writeCheck == FLASH_WRITE_KEY){

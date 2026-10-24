@@ -1,15 +1,13 @@
 
 #include <stdbool.h>
 #include <string.h>
-#include "stm32f1xx_hal.h"
+#include "hal_port.h"
 #include "defines.h"
-#include "setup.h"
+#include "chip_init.h"
 #include "config.h"
 
 #define NUNCHUK_I2C_ADDRESS 0xA4
 
-TIM_HandleTypeDef TimHandle;
-TIM_HandleTypeDef TimHandle2;
 uint8_t  ppm_count = 0;
 uint8_t  pwm_count = 0;
 uint32_t timeoutCntGen = TIMEOUT;
@@ -18,10 +16,6 @@ uint8_t  nunchuk_data[6] = {0};
 
 uint8_t i2cBuffer[2];
 nunchuk_state nunchukState = NUNCHUK_CONNECTING;
-
-extern I2C_HandleTypeDef hi2c2;
-extern DMA_HandleTypeDef hdma_i2c2_rx;
-extern DMA_HandleTypeDef hdma_i2c2_tx;
 
 #if defined(CONTROL_PPM_LEFT) || defined(CONTROL_PPM_RIGHT)
 uint16_t ppm_captured_value[PPM_NUM_CHANNELS + 1] = {500, 500};
@@ -65,37 +59,7 @@ void PPM_SysTick_Callback(void) {
   }
 }
 
-void PPM_Init(void) {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  /*Configure GPIO pin : PA3 */
-  GPIO_InitStruct.Pin = PPM_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(PPM_PORT, &GPIO_InitStruct);
-
-  __HAL_RCC_TIM2_CLK_ENABLE();
-  TimHandle.Instance = TIM2;
-  TimHandle.Init.Period = UINT16_MAX;
-  TimHandle.Init.Prescaler = (SystemCoreClock/DELAY_TIM_FREQUENCY_US)-1;;
-  TimHandle.Init.ClockDivision = 0;
-  TimHandle.Init.CounterMode = TIM_COUNTERMODE_UP;
-  HAL_TIM_Base_Init(&TimHandle);
-
-  #if defined(CONTROL_PPM_LEFT)  
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-  #endif
-
-  #if defined(CONTROL_PPM_RIGHT)  
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-  #endif
-
-  HAL_TIM_Base_Start(&TimHandle);
-}
+/* PPM_Init() 已搬到 chip_init.c */
 #endif
 
 
@@ -124,8 +88,8 @@ static uint16_t pwm_stable_ch2 = 500;
 
 void PWM_ISR_CH1_Callback(void) {
   // Dummy loop with 16 bit count wrap around
-  if(HAL_GPIO_ReadPin(PWM_PORT_CH1, PWM_PIN_CH1)) {   // Rising  Edge interrupt -> save timer value OR reset timer
-    if (HAL_GPIO_ReadPin(PWM_PORT_CH2, PWM_PIN_CH2)) {
+  if(hal_gpio_read(HAL_PIN_PWM_CH1)) {   // Rising  Edge interrupt -> save timer value OR reset timer
+    if (hal_gpio_read(HAL_PIN_PWM_CH2)) {
       pwm_CNT_prev_ch1 = TIM2->CNT;
     } else {
       TIM2->CNT = 0;
@@ -151,8 +115,8 @@ void PWM_ISR_CH1_Callback(void) {
 
 void PWM_ISR_CH2_Callback(void) {
   // Dummy loop with 16 bit count wrap around
-  if(HAL_GPIO_ReadPin(PWM_PORT_CH2, PWM_PIN_CH2)) {   // Rising  Edge interrupt -> save timer value OR reset timer
-    if (HAL_GPIO_ReadPin(PWM_PORT_CH1, PWM_PIN_CH1)) {
+  if(hal_gpio_read(HAL_PIN_PWM_CH2)) {   // Rising  Edge interrupt -> save timer value OR reset timer
+    if (hal_gpio_read(HAL_PIN_PWM_CH1)) {
       pwm_CNT_prev_ch2 = TIM2->CNT;
     } else {
       TIM2->CNT = 0;
@@ -190,62 +154,18 @@ void PWM_SysTick_Callback(void) {
   }
 }
 
-void PWM_Init(void) {
-  // PWM Timer (TIM2)
-  __HAL_RCC_TIM2_CLK_ENABLE();
-  TimHandle.Instance            = TIM2;
-  TimHandle.Init.Period         = UINT16_MAX;
-  TimHandle.Init.Prescaler      = (SystemCoreClock/DELAY_TIM_FREQUENCY_US)-1;;
-  TimHandle.Init.ClockDivision  = 0;
-  TimHandle.Init.CounterMode    = TIM_COUNTERMODE_UP;
-  HAL_TIM_Base_Init(&TimHandle);  
-  
-  // Channel 1 (steering)
-  GPIO_InitTypeDef GPIO_InitStruct1 = {0};
-  // Configure GPIO pin : PA2 (Left) or PB10 (Right)
-  GPIO_InitStruct1.Pin          = PWM_PIN_CH1;
-  GPIO_InitStruct1.Mode         = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct1.Speed        = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct1.Pull         = GPIO_PULLDOWN;
-  HAL_GPIO_Init(PWM_PORT_CH1, &GPIO_InitStruct1);
-
-  // Channel 2 (speed)
-  GPIO_InitTypeDef GPIO_InitStruct2 = {0};
-  /*Configure GPIO pin : PA3 (Left) or PB11 (Right) */
-  GPIO_InitStruct2.Pin          = PWM_PIN_CH2;
-  GPIO_InitStruct2.Mode         = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct2.Speed        = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct2.Pull         = GPIO_PULLDOWN;
-  HAL_GPIO_Init(PWM_PORT_CH2, &GPIO_InitStruct2);
-
-  #ifdef CONTROL_PWM_LEFT
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI2_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-  #endif
-
-  #ifdef CONTROL_PWM_RIGHT
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-  #endif
-
-  // Start timer
-  HAL_TIM_Base_Start(&TimHandle);
-}
+/* PWM_Init() 已搬到 chip_init.c */
 #endif
 
 uint8_t Nunchuk_tx(uint8_t i2cBuffer[], uint8_t i2cBufferLength) {
-  if(HAL_I2C_Master_Transmit(&hi2c2,NUNCHUK_I2C_ADDRESS,(uint8_t*)i2cBuffer, i2cBufferLength, 100) == HAL_OK) {
+  if(hal_i2c_master_transmit(HAL_I2C_NUNCHUK,NUNCHUK_I2C_ADDRESS,(uint8_t*)i2cBuffer, i2cBufferLength, 100) == HAL_PORT_OK) {
     return true;
   }
   return false;
 }
 
 uint8_t Nunchuk_rx(uint8_t i2cBuffer[], uint8_t i2cBufferLength) {
-  if(HAL_I2C_Master_Receive(&hi2c2,NUNCHUK_I2C_ADDRESS,(uint8_t*)i2cBuffer, i2cBufferLength, 100) == HAL_OK) {
+  if(hal_i2c_master_receive(HAL_I2C_NUNCHUK,NUNCHUK_I2C_ADDRESS,(uint8_t*)i2cBuffer, i2cBufferLength, 100) == HAL_PORT_OK) {
     return true;
   }
   return false;
@@ -259,7 +179,7 @@ uint8_t Nunchuk_Init(void) {
   if(Nunchuk_tx(i2cBuffer, 2) == false) {
     return false;
   }
-  HAL_Delay(10);
+  hal_delay_ms(10);
 
   i2cBuffer[0] = 0xFB;
   i2cBuffer[1] = 0x00;
@@ -267,7 +187,7 @@ uint8_t Nunchuk_Init(void) {
   if(Nunchuk_tx(i2cBuffer, 2) == false) {
     return false;
   }
-  HAL_Delay(10);
+  hal_delay_ms(10);
 
   return true;
 }
@@ -316,7 +236,7 @@ nunchuk_state Nunchuk_Read(void) {
       if(!Nunchuk_tx(i2cBuffer, 1)) {
         success = false;
       }
-      HAL_Delay(3);
+      hal_delay_ms(3);
 
       /* Clear the receive data buffer */
       for(i = 0; i<6; i++) {
@@ -327,7 +247,7 @@ nunchuk_state Nunchuk_Read(void) {
       if(!Nunchuk_rx(nunchuk_data, 6)) {
         success = false;
       }
-      HAL_Delay(3);
+      hal_delay_ms(3);
 
       /* Checksum the receive buffer to ensure it is not in an error condition, i.e. all 0x00 or 0xFF */
       for(i = 0; i<6; i++) {

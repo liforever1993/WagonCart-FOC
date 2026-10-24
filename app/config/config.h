@@ -2,7 +2,16 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include "stm32f1xx_hal.h"
+/*
+ * config.h 是纯软件配置，不依赖任何 vendor HAL/CMSIS 头。
+ * 硬件细节（引脚枚举、UART 波特率枚举）由 hal/chip/hal_port.h
+ * 及其所包含的 chip/<vendor>/chip_config.h 提供。
+ */
+
+// STM32 HAL 兼容值 — 此处替代原 HAL 宏 UART_WORDLENGTH_8B = 0x00000000U
+#ifndef UART_WORDLENGTH_8B
+  #define UART_WORDLENGTH_8B   (0x00U)
+#endif
 
 // ############################### VARIANT SELECTION ###############################
 // PlatformIO: uncomment desired variant in platformio.ini

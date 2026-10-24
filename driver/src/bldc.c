@@ -22,9 +22,9 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stm32f1xx_hal.h"
+#include "hal_port.h"
 #include "defines.h"
-#include "setup.h"
+#include "chip_init.h"
 #include "config.h"
 #include "util.h"
 
@@ -141,10 +141,10 @@ void DMA1_Channel1_IRQHandler(void) {
       }
     }
     if (buzzerTimer % buzzerFreq == 0 && (buzzerIdx <= buzzerCount || buzzerCount == 0)) {
-      HAL_GPIO_TogglePin(BUZZER_PORT, BUZZER_PIN);
+      hal_gpio_write(HAL_PIN_BUZZER, !hal_gpio_read(HAL_PIN_BUZZER));
     }
   } else if (buzzerPrev) {
-      HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_RESET);
+      hal_gpio_write(HAL_PIN_BUZZER, 0);
       buzzerPrev = 0;
   }
 #endif

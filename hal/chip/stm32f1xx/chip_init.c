@@ -37,10 +37,11 @@ pb10 usart3 dma1 channel2/3
 
 #include "defines.h"
 #include "config.h"
-#include "setup.h"
+#include "chip_init.h"
 
 TIM_HandleTypeDef htim_right;
 TIM_HandleTypeDef htim_left;
+static TIM_HandleTypeDef htim2_ppm_pwm;   /* PPM/PWM 捕获共用 TIM2 */
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 I2C_HandleTypeDef hi2c2;
@@ -707,4 +708,145 @@ void MX_ADC2_Init(void) {
 
   hadc2.Instance->CR2 |= ADC_CR2_DMA;
   __HAL_ADC_ENABLE(&hadc2);
+}
+
+/* =====================================================================
+ * 系统级初始化 —— 原 main() 开头的 HAL 初始化序列
+ * ===================================================================== */
+static void SystemClock_Config(void); /* 前向声明，定义在文件末尾 */
+
+void chip_system_init(void) {
+    HAL_Init();
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+
+    /* System interrupt init */
+    HAL_NVIC_SetPriority(MemoryManagement_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(BusFault_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(UsageFault_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(SVCall_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(DebugMonitor_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(PendSV_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+
+    SystemClock_Config();
+
+    __HAL_RCC_DMA1_CLK_DISABLE();
+}
+
+void chip_peripheral_init(void) {
+    MX_GPIO_Init();
+    MX_TIM_Init();
+    MX_ADC1_Init();
+    MX_ADC2_Init();
+}
+
+void chip_adc_start(void) {
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_Start(&hadc2);
+}
+
+/* =====================================================================
+ * PPM / PWM 输入捕获初始化 —— 从 app/control.c 搬过来
+ * control.c 保留 ISR Callback（业务逻辑），这里只做硬件初始化
+ * ===================================================================== */
+#if defined(CONTROL_PPM_LEFT) || defined(CONTROL_PPM_RIGHT)
+void PPM_Init(void) {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin   = PPM_PIN;
+    GPIO_InitStruct.Mode  = GPIO_MODE_IT_FALLING;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Pull  = GPIO_PULLDOWN;
+    HAL_GPIO_Init(PPM_PORT, &GPIO_InitStruct);
+
+    __HAL_RCC_TIM2_CLK_ENABLE();
+    htim2_ppm_pwm.Instance    = TIM2;
+    htim2_ppm_pwm.Init.Period       = UINT16_MAX;
+    htim2_ppm_pwm.Init.Prescaler    = (SystemCoreClock/DELAY_TIM_FREQUENCY_US)-1;
+    htim2_ppm_pwm.Init.ClockDivision = 0;
+    htim2_ppm_pwm.Init.CounterMode  = TIM_COUNTERMODE_UP;
+    HAL_TIM_Base_Init(&htim2_ppm_pwm);
+
+    #if defined(CONTROL_PPM_LEFT)
+    HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+    #endif
+    #if defined(CONTROL_PPM_RIGHT)
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    #endif
+    HAL_TIM_Base_Start(&htim2_ppm_pwm);
+}
+#endif
+
+#if defined(CONTROL_PWM_LEFT) || defined(CONTROL_PWM_RIGHT)
+void PWM_Init(void) {
+    __HAL_RCC_TIM2_CLK_ENABLE();
+    htim2_ppm_pwm.Instance         = TIM2;
+    htim2_ppm_pwm.Init.Period      = UINT16_MAX;
+    htim2_ppm_pwm.Init.Prescaler   = (SystemCoreClock/DELAY_TIM_FREQUENCY_US)-1;
+    htim2_ppm_pwm.Init.ClockDivision = 0;
+    htim2_ppm_pwm.Init.CounterMode = TIM_COUNTERMODE_UP;
+    HAL_TIM_Base_Init(&htim2_ppm_pwm);
+
+    GPIO_InitTypeDef GPIO_InitStruct1 = {0};
+    GPIO_InitStruct1.Pin   = PWM_PIN_CH1;
+    GPIO_InitStruct1.Mode  = GPIO_MODE_IT_RISING_FALLING;
+    GPIO_InitStruct1.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct1.Pull  = GPIO_PULLDOWN;
+    HAL_GPIO_Init(PWM_PORT_CH1, &GPIO_InitStruct1);
+
+    GPIO_InitTypeDef GPIO_InitStruct2 = {0};
+    GPIO_InitStruct2.Pin   = PWM_PIN_CH2;
+    GPIO_InitStruct2.Mode  = GPIO_MODE_IT_RISING_FALLING;
+    GPIO_InitStruct2.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct2.Pull  = GPIO_PULLDOWN;
+    HAL_GPIO_Init(PWM_PORT_CH2, &GPIO_InitStruct2);
+
+    #ifdef CONTROL_PWM_LEFT
+    HAL_NVIC_SetPriority(EXTI2_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+    HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+    #endif
+    #ifdef CONTROL_PWM_RIGHT
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    #endif
+    HAL_TIM_Base_Start(&htim2_ppm_pwm);
+}
+#endif
+
+/* =====================================================================
+ * System Clock Configuration —— 从 main.c 搬过来
+ * ===================================================================== */
+static void SystemClock_Config(void)
+{
+    RCC_OscInitTypeDef RCC_OscInitStruct;
+    RCC_ClkInitTypeDef RCC_ClkInitStruct;
+    RCC_PeriphCLKInitTypeDef PeriphClkInit;
+
+    RCC_OscInitStruct.OscillatorType      = RCC_OSCILLATORTYPE_HSI;
+    RCC_OscInitStruct.HSIState            = RCC_HSI_ON;
+    RCC_OscInitStruct.HSICalibrationValue = 16;
+    RCC_OscInitStruct.PLL.PLLState        = RCC_PLL_ON;
+    RCC_OscInitStruct.PLL.PLLSource       = RCC_PLLSOURCE_HSI_DIV2;
+    RCC_OscInitStruct.PLL.PLLMUL          = RCC_PLL_MUL16;
+    HAL_RCC_OscConfig(&RCC_OscInitStruct);
+
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                                | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK;
+    RCC_ClkInitStruct.AHBCLKDivider  = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+    PeriphClkInit.AdcClockSelection    = RCC_ADCPCLK2_DIV4; /* 16 MHz */
+    HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+
+    HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000);
+    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }

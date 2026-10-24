@@ -22,9 +22,9 @@
 
 #include <stdio.h>
 #include <stdlib.h> // for abs()
-#include "stm32f1xx_hal.h"
+#include "hal_port.h"
 #include "defines.h"
-#include "setup.h"
+#include "chip_init.h"
 #include "config.h"
 #include "util.h"
 #include "BLDC_controller.h" /* BLDC's header file */
@@ -32,19 +32,10 @@
 #include "comms.h"
 #include "log_output.h"
 
-void SystemClock_Config(void);
-
 //------------------------------------------------------------------------
 // Global variables set externally
 //------------------------------------------------------------------------
-extern TIM_HandleTypeDef htim_left;
-extern TIM_HandleTypeDef htim_right;
-extern ADC_HandleTypeDef hadc1;
-extern ADC_HandleTypeDef hadc2;
 extern volatile adc_buf_t adc_buffer;
-
-extern UART_HandleTypeDef huart2;
-extern UART_HandleTypeDef huart3;
 
 volatile uint8_t uart_buf[200];
 
@@ -173,43 +164,18 @@ static uint16_t max_speed;
 
 int main(void)
 {
-    HAL_Init();
-    __HAL_RCC_AFIO_CLK_ENABLE();
-    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
-    /* System interrupt init*/
-    /* MemoryManagement_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(MemoryManagement_IRQn, 0, 0);
-    /* BusFault_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(BusFault_IRQn, 0, 0);
-    /* UsageFault_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(UsageFault_IRQn, 0, 0);
-    /* SVCall_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(SVCall_IRQn, 0, 0);
-    /* DebugMonitor_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(DebugMonitor_IRQn, 0, 0);
-    /* PendSV_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(PendSV_IRQn, 0, 0);
-    /* SysTick_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+    chip_system_init();      /* HAL_Init + NVIC 优先级 + 时钟配置 + DMA 关闭 */
+    chip_peripheral_init(); /* MX_GPIO_Init + MX_TIM_Init + MX_ADC1/2_Init */
+    BLDC_Init();             /* BLDC Controller Init（MATLAB 生成，不碰 HAL）*/
 
-    SystemClock_Config();
+    hal_gpio_write(HAL_PIN_POWER_EN, 1); /* Activate Latch */
+    Input_Lim_Init();                     /* Input Limitations Init */
+    Input_Init();                         /* Input Init */
 
-    __HAL_RCC_DMA1_CLK_DISABLE();
-    MX_GPIO_Init();
-    MX_TIM_Init();
-    MX_ADC1_Init();
-    MX_ADC2_Init();
-    BLDC_Init(); // BLDC Controller Init
-
-    HAL_GPIO_WritePin(POWER_EN_PORT, POWER_EN_PIN, GPIO_PIN_SET); // Activate Latch
-    Input_Lim_Init();                                             // Input Limitations Init
-    Input_Init();                                                 // Input Init
-
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_Start(&hadc2);
+    chip_adc_start();
 
     poweronMelody();
-    HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_SET);
+    hal_gpio_write(HAL_PIN_LED, 1);
 
     int32_t board_temp_adcFixdt =
         adc_buffer.temp << 16; // Fixed-point filter output initialized with current ADC converted to fixed-point
@@ -245,7 +211,7 @@ int main(void)
     // Wait until triggers are released. Exit if timeout elapses (to unblock if the inputs are not calibrated)
     int iTimeout = 0;
     while ((adc_buffer.l_rx2 + adc_buffer.l_tx2) >= (input1[0].min + input2[0].min) && iTimeout++ < 300) {
-        HAL_Delay(10);
+        hal_delay_ms(10);
     }
 #endif
 
@@ -261,7 +227,7 @@ int main(void)
                 if (!rtY_Left.z_errCode && !rtY_Right.z_errCode) {
                     beepShort(6); // make 2 beeps indicating the motor enable
                     beepShort(4);
-                    HAL_Delay(100);
+                    hal_delay_ms(100);
                     steerFixdt = speedFixdt = 0; // reset filters
                     motorEnable             = 1; // enable motors
                     printf_log("-- Motors enabled --\r\n");
@@ -296,7 +262,7 @@ int main(void)
             if (inIdx == CONTROL_ADC) { // Only use use implementation below if pedals are in use (ADC input)
                 if (speedAvgAbs < 60) { // Check if Hovercar is physically close to standstill to enable Double tap
                                         // detection on Brake pedal for Reverse functionality
-                    multipleTapDet(input1[inIdx].cmd, HAL_GetTick(),
+                    multipleTapDet(input1[inIdx].cmd, hal_get_tick_ms(),
                                    &MultipleTapBrake); // Brake pedal in this case is "input1" variable
                 }
 
@@ -413,7 +379,7 @@ int main(void)
 #endif
 
                     if (checkRemote) {
-                        if (!HAL_GPIO_ReadPin(LED_PORT, LED_PIN)) {
+                        if (!hal_gpio_read(HAL_PIN_LED)) {
                             // motorEnable = 1;
                         }
                         else {
@@ -432,7 +398,7 @@ int main(void)
                 pwml        = 0;
                 pwmr        = 0;
                 motorEnable = 0;
-                HAL_Delay(1000);
+                hal_delay_ms(1000);
                 nunchuk_connected = 0;
             }
 
@@ -569,23 +535,23 @@ int main(void)
             Feedback.boardTemp   = (int16_t)board_temp_deg_c;
 
 #if defined(FEEDBACK_SERIAL_USART2)
-            if (__HAL_DMA_GET_COUNTER(huart2.hdmatx) == 0) {
+            if (!hal_tty_dma_tx_busy(HAL_UART_SIDE)) {
                 Feedback.cmdLed = (uint16_t)sideboard_leds_L;
                 Feedback.checksum =
                     (uint16_t)(Feedback.start ^ Feedback.cmd1 ^ Feedback.cmd2 ^ Feedback.speedR_meas ^
                                Feedback.speedL_meas ^ Feedback.batVoltage ^ Feedback.boardTemp ^ Feedback.cmdLed);
 
-                HAL_UART_Transmit_DMA(&huart2, (uint8_t *)&Feedback, sizeof(Feedback));
+                hal_tty_write_dma(HAL_UART_SIDE, (uint8_t *)&Feedback, sizeof(Feedback));
             }
 #endif
 #if defined(FEEDBACK_SERIAL_USART3)
-            if (__HAL_DMA_GET_COUNTER(huart3.hdmatx) == 0) {
+            if (!hal_tty_dma_tx_busy(HAL_UART_CONTROL)) {
                 Feedback.cmdLed = (uint16_t)sideboard_leds_R;
                 Feedback.checksum =
                     (uint16_t)(Feedback.start ^ Feedback.cmd1 ^ Feedback.cmd2 ^ Feedback.speedR_meas ^
                                Feedback.speedL_meas ^ Feedback.batVoltage ^ Feedback.boardTemp ^ Feedback.cmdLed);
 
-                HAL_UART_Transmit_DMA(&huart3, (uint8_t *)&Feedback, sizeof(Feedback));
+                hal_tty_write_dma(HAL_UART_CONTROL, (uint8_t *)&Feedback, sizeof(Feedback));
             }
 #endif
         }
@@ -667,48 +633,4 @@ int main(void)
 }
 }
 
-// ===========================================================
-/** System Clock Configuration
- */
-void SystemClock_Config(void)
-{
-    RCC_OscInitTypeDef RCC_OscInitStruct;
-    RCC_ClkInitTypeDef RCC_ClkInitStruct;
-    RCC_PeriphCLKInitTypeDef PeriphClkInit;
 
-    /**Initializes the CPU, AHB and APB busses clocks
-     */
-    RCC_OscInitStruct.OscillatorType      = RCC_OSCILLATORTYPE_HSI;
-    RCC_OscInitStruct.HSIState            = RCC_HSI_ON;
-    RCC_OscInitStruct.HSICalibrationValue = 16;
-    RCC_OscInitStruct.PLL.PLLState        = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource       = RCC_PLLSOURCE_HSI_DIV2;
-    RCC_OscInitStruct.PLL.PLLMUL          = RCC_PLL_MUL16;
-    HAL_RCC_OscConfig(&RCC_OscInitStruct);
-
-    /**Initializes the CPU, AHB and APB busses clocks
-     */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider  = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
-
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-    // PeriphClkInit.AdcClockSelection    = RCC_ADCPCLK2_DIV8;  // 8 MHz
-    PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV4; // 16 MHz
-    HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
-
-    /**Configure the Systick interrupt time
-     */
-    HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000);
-
-    /**Configure the Systick
-     */
-    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-
-    /* SysTick_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-}

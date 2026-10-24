@@ -24,9 +24,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "stm32f1xx_hal.h"
+#include "hal_port.h"
 #include "defines.h"
-#include "setup.h"
 #include "config.h"
 #include "eeprom.h"
 #include "util.h"
@@ -42,9 +41,6 @@
 // Global variables set externally
 //------------------------------------------------------------------------
 extern volatile adc_buf_t adc_buffer;
-extern I2C_HandleTypeDef hi2c2;
-extern UART_HandleTypeDef huart2;
-extern UART_HandleTypeDef huart3;
 
 extern int16_t batVoltage;
 extern uint8_t backwardDrive;
@@ -337,9 +333,9 @@ static uint8_t standstillAcv = 0;
 PUTCHAR_PROTOTYPE
 {
 #if defined(DEBUG_SERIAL_USART2)
-    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 1000);
+    hal_tty_write(HAL_UART_DEBUG, (uint8_t *)&ch, 1, 1000);
 #elif defined(DEBUG_SERIAL_USART3)
-    HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, 1000);
+    hal_tty_write(HAL_UART_DEBUG, (uint8_t *)&ch, 1, 1000);
 #endif
     return ch;
 }
@@ -465,17 +461,17 @@ void Input_Init(void)
     UART3_Init();
 #endif
 #if defined(DEBUG_SERIAL_USART2) || defined(CONTROL_SERIAL_USART2) || defined(SIDEBOARD_SERIAL_USART2)
-    HAL_UART_Receive_DMA(&huart2, (uint8_t *)rx_buffer_L, sizeof(rx_buffer_L));
-    UART_DisableRxErrors(&huart2);
+    hal_tty_start_rx_dma(HAL_UART_DEBUG, (uint8_t *)rx_buffer_L, sizeof(rx_buffer_L));
+    hal_tty_disable_rx_errors(HAL_UART_DEBUG);
 #endif
 #if defined(DEBUG_SERIAL_USART3) || defined(CONTROL_SERIAL_USART3) || defined(SIDEBOARD_SERIAL_USART3)
-    HAL_UART_Receive_DMA(&huart3, (uint8_t *)rx_buffer_R, sizeof(rx_buffer_R));
-    UART_DisableRxErrors(&huart3);
+    hal_tty_start_rx_dma(HAL_UART_DEBUG, (uint8_t *)rx_buffer_R, sizeof(rx_buffer_R));
+    hal_tty_disable_rx_errors(HAL_UART_DEBUG);
 #endif
 
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
     uint16_t writeCheck, readVal;
-    HAL_FLASH_Unlock();
+    hal_flash_unlock();
     EE_Init(); /* EEPROM Init */
     EE_ReadVariable(VirtAddVarTab[0], &writeCheck);
     if (writeCheck == FLASH_WRITE_KEY) {
@@ -530,15 +526,15 @@ void Input_Init(void)
                    input2[i].mid, input2[i].max);
         }
     }
-    HAL_FLASH_Lock();
+    hal_flash_lock();
 #endif
 
 #ifdef VARIANT_TRANSPOTTER
     motorEnable = 1;
-    HAL_FLASH_Unlock();
+    hal_flash_unlock();
     EE_Init(); /* EEPROM Init */
     EE_ReadVariable(VirtAddVarTab[0], &saveValue);
-    HAL_FLASH_Lock();
+    hal_flash_lock();
 
     setDistance = saveValue / 1000.0;
     if (setDistance < 0.2) {
@@ -547,22 +543,6 @@ void Input_Init(void)
 #endif
 }
 
-/**
- * @brief  Disable Rx Errors detection interrupts on UART peripheral (since we do not want DMA to be stopped)
- *         The incorrect data will be filtered based on the START_FRAME and checksum.
- * @param  huart: UART handle.
- * @retval None
- */
-#if defined(DEBUG_SERIAL_USART2) || defined(CONTROL_SERIAL_USART2) || defined(SIDEBOARD_SERIAL_USART2) ||              \
-    defined(DEBUG_SERIAL_USART3) || defined(CONTROL_SERIAL_USART3) || defined(SIDEBOARD_SERIAL_USART3)
-void UART_DisableRxErrors(UART_HandleTypeDef *huart)
-{
-    CLEAR_BIT(huart->Instance->CR1, USART_CR1_PEIE); /* Disable PE (Parity Error) interrupts */
-    CLEAR_BIT(huart->Instance->CR3,
-              USART_CR3_EIE); /* Disable EIE (Frame error, noise error, overrun error) interrupts */
-}
-#endif
-
 /* =========================== General Functions =========================== */
 
 void poweronMelody(void)
@@ -570,7 +550,7 @@ void poweronMelody(void)
     buzzerCount = 0; // prevent interraction with beep counter
     for (int i = 8; i >= 0; i--) {
         buzzerFreq = (uint8_t)i;
-        HAL_Delay(100);
+        hal_delay_ms(100);
     }
     buzzerFreq = 0;
 }
@@ -586,7 +566,7 @@ void beepLong(uint8_t freq)
 {
     buzzerCount = 0; // prevent interraction with beep counter
     buzzerFreq  = freq;
-    HAL_Delay(500);
+    hal_delay_ms(500);
     buzzerFreq = 0;
 }
 
@@ -594,7 +574,7 @@ void beepShort(uint8_t freq)
 {
     buzzerCount = 0; // prevent interraction with beep counter
     buzzerFreq  = freq;
-    HAL_Delay(100);
+    hal_delay_ms(100);
     buzzerFreq = 0;
 }
 
@@ -697,7 +677,7 @@ void adcCalibLim(void)
 #endif
 
     // Extract MIN, MAX and MID from ADC while the power button is not pressed
-    while (!HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN) && input_cal_timeout++ < 4000) { // 20 sec timeout
+    while (!hal_gpio_read(HAL_PIN_BUTTON) && input_cal_timeout++ < 4000) { // 20 sec timeout
         readInputRaw();
         filtLowPass32(input1[inIdx].raw, FILTER, &input1_fixdt);
         filtLowPass32(input2[inIdx].raw, FILTER, &input2_fixdt);
@@ -710,7 +690,7 @@ void adcCalibLim(void)
         INPUT1_MAX_temp = MAX(INPUT1_MAX_temp, INPUT1_MID_temp);
         INPUT2_MIN_temp = MIN(INPUT2_MIN_temp, INPUT2_MID_temp);
         INPUT2_MAX_temp = MAX(INPUT2_MAX_temp, INPUT2_MID_temp);
-        HAL_Delay(5);
+        hal_delay_ms(5);
     }
 
     printf_log("Input1 is ");
@@ -785,11 +765,11 @@ void updateCurSpdLim(void)
     cur_spd_valid            = 0;
 
     // Wait for the power button press
-    while (!HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN) && cur_spd_timeout++ < 2000) { // 10 sec timeout
+    while (!hal_gpio_read(HAL_PIN_BUTTON) && cur_spd_timeout++ < 2000) { // 10 sec timeout
         readInputRaw();
         filtLowPass32(input1[inIdx].raw, FILTER, &input1_fixdt);
         filtLowPass32(input2[inIdx].raw, FILTER, &input2_fixdt);
-        HAL_Delay(5);
+        hal_delay_ms(5);
     }
     // Calculate scaling factors
     cur_factor = CLAMP((input1_fixdt - (input1[inIdx].min << 16)) / (input1[inIdx].max - input1[inIdx].min), 6553,
@@ -1299,8 +1279,8 @@ void readCommand(void)
 #endif
 
 #if defined(SUPPORT_BUTTONS_LEFT) || defined(SUPPORT_BUTTONS_RIGHT)
-    button1 = !HAL_GPIO_ReadPin(BUTTON1_PORT, BUTTON1_PIN);
-    button2 = !HAL_GPIO_ReadPin(BUTTON2_PORT, BUTTON2_PIN);
+    button1 = !hal_gpio_read(HAL_PIN_BUTTON1);
+    button2 = !hal_gpio_read(HAL_PIN_BUTTON2);
 #endif
 
 #if defined(CRUISE_CONTROL_SUPPORT) &&                                                                                 \
@@ -1319,7 +1299,7 @@ void usart2_rx_check(void)
 #if defined(DEBUG_SERIAL_USART2) || defined(CONTROL_SERIAL_USART2) || defined(SIDEBOARD_SERIAL_USART2)
     static uint32_t old_pos;
     uint32_t pos;
-    pos = rx_buffer_L_len - __HAL_DMA_GET_COUNTER(huart2.hdmarx); // Calculate current position in buffer
+    pos = hal_tty_dma_pos(HAL_UART_DEBUG, rx_buffer_L_len); // Calculate current position in buffer
 #endif
 
 #if defined(DEBUG_SERIAL_USART2)
@@ -1400,7 +1380,7 @@ void usart3_rx_check(void)
 #if defined(DEBUG_SERIAL_USART3) || defined(CONTROL_SERIAL_USART3) || defined(SIDEBOARD_SERIAL_USART3)
     static uint32_t old_pos;
     uint32_t pos;
-    pos = rx_buffer_R_len - __HAL_DMA_GET_COUNTER(huart3.hdmarx); // Calculate current position in buffer
+    pos = hal_tty_dma_pos(HAL_UART_DEBUG, rx_buffer_R_len); // Calculate current position in buffer
 #endif
 
 #if defined(DEBUG_SERIAL_USART3)
@@ -1799,16 +1779,16 @@ void saveConfig()
 {
 #ifdef VARIANT_TRANSPOTTER
     if (saveValue_valid) {
-        HAL_FLASH_Unlock();
+        hal_flash_unlock();
         EE_WriteVariable(VirtAddVarTab[0], saveValue);
-        HAL_FLASH_Lock();
+        hal_flash_lock();
     }
 #endif
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
     if (inp_cal_valid || cur_spd_valid || hall_cal_valid) {
         printf_log("Saving configuration to EEprom\r\n");
 
-        HAL_FLASH_Unlock();
+        hal_flash_unlock();
         EE_WriteVariable(VirtAddVarTab[0], (uint16_t)FLASH_WRITE_KEY);
         EE_WriteVariable(VirtAddVarTab[1], (uint16_t)rtP_Left.i_max);
         EE_WriteVariable(VirtAddVarTab[2], (uint16_t)rtP_Left.n_max);
@@ -1822,7 +1802,7 @@ void saveConfig()
             EE_WriteVariable(VirtAddVarTab[9 + 8 * i], (uint16_t)input2[i].mid);
             EE_WriteVariable(VirtAddVarTab[10 + 8 * i], (uint16_t)input2[i].max);
         }
-        HAL_FLASH_Lock();
+        hal_flash_lock();
         hall_cal_valid = 0;
     }
 #endif
@@ -1836,10 +1816,10 @@ void poweroff(void)
     buzzerPattern = 0;
     for (int i = 0; i < 8; i++) {
         buzzerFreq = (uint8_t)i;
-        HAL_Delay(100);
+        hal_delay_ms(100);
     }
     saveConfig();
-    HAL_GPIO_WritePin(POWER_EN_PORT, POWER_EN_PIN, GPIO_PIN_RESET);
+    hal_gpio_write(HAL_PIN_POWER_EN, 0);
     while (1) {
     }
 }
@@ -1847,10 +1827,10 @@ void poweroff(void)
 void poweroffPressCheck(void)
 {
 #if !defined(VARIANT_HOVERBOARD) && !defined(VARIANT_TRANSPOTTER)
-    if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
+    if (hal_gpio_read(HAL_PIN_BUTTON)) {
         uint16_t cnt_press = 0;
-        while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-            HAL_Delay(10);
+        while (hal_gpio_read(HAL_PIN_BUTTON)) {
+            hal_delay_ms(10);
             if (cnt_press++ == 5 * 100) {
                 beepShort(5);
             }
@@ -1860,10 +1840,10 @@ void poweroffPressCheck(void)
             motorEnable = 0;
 
         if (cnt_press >= 5 * 100) { // Check if press is more than 5 sec
-            HAL_Delay(1000);
-            if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) { // Double press: Adjust Max Current, Max Speed
-                while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-                    HAL_Delay(10);
+            hal_delay_ms(1000);
+            if (hal_gpio_read(HAL_PIN_BUTTON)) { // Double press: Adjust Max Current, Max Speed
+                while (hal_gpio_read(HAL_PIN_BUTTON)) {
+                    hal_delay_ms(10);
                 }
                 beepLong(8);
                 updateCurSpdLim();
@@ -1883,19 +1863,19 @@ void poweroffPressCheck(void)
         }
     }
 #elif defined(VARIANT_TRANSPOTTER)
-    if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
+    if (hal_gpio_read(HAL_PIN_BUTTON)) {
         motorEnable = 0;
-        while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-            HAL_Delay(10);
+        while (hal_gpio_read(HAL_PIN_BUTTON)) {
+            hal_delay_ms(10);
         }
         beepShort(5);
-        HAL_Delay(300);
-        if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-            while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
-                HAL_Delay(10);
+        hal_delay_ms(300);
+        if (hal_gpio_read(HAL_PIN_BUTTON)) {
+            while (hal_gpio_read(HAL_PIN_BUTTON)) {
+                hal_delay_ms(10);
             }
             beepLong(5);
-            HAL_Delay(350);
+            hal_delay_ms(350);
             poweroff();
         }
         else {
@@ -1909,9 +1889,9 @@ void poweroffPressCheck(void)
         }
     }
 #else
-    if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
+    if (hal_gpio_read(HAL_PIN_BUTTON)) {
         motorEnable = 0; // disable motors
-        while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {
+        while (hal_gpio_read(HAL_PIN_BUTTON)) {
         } // wait until button is released
         poweroff(); // release power-latch
     }

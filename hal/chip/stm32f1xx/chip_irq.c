@@ -33,7 +33,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx.h"
-#include "stm32f1xx_it.h"
+#include "chip_irq.h"
 #include "defines.h"
 #include "config.h"
 #include "util.h"

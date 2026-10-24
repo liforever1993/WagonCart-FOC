@@ -20,11 +20,23 @@
 */
 
 // Define to prevent recursive inclusion
-#ifndef SETUP_H
-#define SETUP_H
+#ifndef CHIP_INIT_H
+#define CHIP_INIT_H
 
-#include "stm32f1xx_hal.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+/* =====================================================================
+ * 系统级初始化 —— 把 main() 开头的 HAL_Init / 时钟 / NVIC 全封在 chip 层
+ * ===================================================================== */
+void chip_system_init(void);       /* HAL_Init + NVIC 优先级分组 + SystemClock_Config */
+void chip_peripheral_init(void);   /* MX_GPIO_Init + MX_TIM_Init + MX_ADC1/2_Init + UART/DMA */
+void chip_adc_start(void);         /* HAL_ADC_Start(&hadc1/2) */
+
+/* =====================================================================
+ * 外设初始化函数（仍暴露，供 chip 层内部或特殊场景调用）
+ * ===================================================================== */
 void MX_GPIO_Init(void);
 void MX_TIM_Init(void);
 void MX_ADC1_Init(void);
@@ -32,5 +44,8 @@ void MX_ADC2_Init(void);
 void UART2_Init(void);
 void UART3_Init(void);
 
+#ifdef __cplusplus
+}
 #endif
 
+#endif /* CHIP_INIT_H */
