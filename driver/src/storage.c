@@ -1,4 +1,4 @@
-#include "storgae.h"
+#include "storage.h"
 #include <flashdb.h>
 
 /* KVDB object */
