@@ -106,6 +106,7 @@ struct parameter_entry_struct {
   const uint8_t fix;
   void (*callback_function)();
   const char *help;
+  const uint8_t addr;
 };
 
 #endif  // DEBUG_SERIAL_PROTOCOL

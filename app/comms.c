@@ -145,17 +145,17 @@ const parameter_entry params[] = {
 
 };
 
-const char *errors[9] = {
-  "Command not found", // Err1
-  "Parameter not found", // Err2
+const char *errors[10] = {
+  "Command not found",                       // Err1
+  "Parameter not found",                     // Err2
   "This command cannot be used with a Variable", // Err3
-  "Value not in range", // Err4
-  "Value expected", // Err5
-  "Start of line expected", // Err6
-  "End of line expected", // Err7
-  "Parameter expected", // Err8
-  "Uncaught error" // Err9
-  "Watch list is full" // Err10
+  "Value not in range",                      // Err4
+  "Value expected",                          // Err5
+  "Start of line expected",                  // Err6
+  "End of line expected",                    // Err7
+  "Parameter expected",                      // Err8
+  "Uncaught error",                          // Err9
+  "Watch list is full"                       // Err10
 };
 
 debug_command command;
